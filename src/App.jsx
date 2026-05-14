@@ -97,25 +97,91 @@ function UploadZone({ onData }) {
     }
     r.readAsArrayBuffer(f)
   }
+
+  const claims = [
+    { icon: '⚡', text: 'Valuation range in under 60 seconds' },
+    { icon: '📐', text: 'OLS, Ridge & Fixed Effects — pick your model' },
+    { icon: '🎯', text: 'Relative mode removes macro noise' },
+    { icon: '💬', text: 'Ask the AI anything about your results' },
+  ]
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-      <div style={{ maxWidth: 480, width: '100%', textAlign: 'center' }}>
-        <div className="fade-up" style={{ marginBottom: 48 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.2em', color: 'var(--blue)', textTransform: 'uppercase', marginBottom: 14 }}>ValuationEngine</div>
-          <div style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.2, marginBottom: 12 }}>Regression-Based<br />Valuation Support</div>
-          <div style={{ fontSize: 15, color: 'var(--text2)', fontWeight: 300 }}>M&A Advisory · Comparable Analysis</div>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Hero */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 32px' }}>
+        <div style={{ maxWidth: 900, width: '100%' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center' }}>
+            {/* Left: copy */}
+            <div className="fade-up">
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', color: 'var(--blue)', textTransform: 'uppercase', marginBottom: 18 }}>
+                TierOne M&A · ValuationEngine
+              </div>
+              <h1 style={{ fontSize: 42, fontWeight: 700, lineHeight: 1.1, marginBottom: 20, letterSpacing: '-0.02em' }}>
+                Stop guessing.<br />
+                <span style={{ color: 'var(--blue)' }}>Let the data</span><br />
+                set the range.
+              </h1>
+              <p style={{ fontSize: 16, color: 'var(--text2)', lineHeight: 1.8, marginBottom: 28, fontWeight: 300 }}>
+                Regression-based comparable analysis that tells you <em>which</em> companies are mispriced and <em>why</em> — in language you can take into a room.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 36 }}>
+                {claims.map(({ icon, text }) => (
+                  <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text2)' }}>
+                    <span style={{ fontSize: 16 }}>{icon}</span>
+                    {text}
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.7, padding: '10px 14px', background: 'var(--bg2)', borderRadius: 10, borderLeft: '3px solid var(--blue)' }}>
+                Built for deal teams who need to move fast and defend their numbers.
+              </div>
+            </div>
+
+            {/* Right: upload */}
+            <div className="fade-up d2">
+              <div
+                onDragOver={e => { e.preventDefault(); setDrag(true) }}
+                onDragLeave={() => setDrag(false)}
+                onDrop={e => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files[0]) }}
+                onClick={() => !loading && document.getElementById('xlsxIn').click()}
+                style={{
+                  border: `2px dashed ${drag ? 'var(--blue)' : 'var(--border-h)'}`,
+                  borderRadius: 24, padding: '52px 36px',
+                  cursor: loading ? 'wait' : 'pointer',
+                  background: drag ? 'var(--blue-d)' : 'var(--bg1)',
+                  transition: 'all 0.2s ease',
+                  transform: drag ? 'scale(1.02)' : 'scale(1)',
+                  textAlign: 'center'
+                }}>
+                {loading
+                  ? <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+                      <div className="spinner" style={{ width: 32, height: 32, border: '3px solid var(--bg3)', borderTopColor: 'var(--blue)' }} />
+                      <div style={{ color: 'var(--text2)', fontSize: 14 }}>Reading your data…</div>
+                    </div>
+                  : <>
+                      <div style={{ fontSize: 42, marginBottom: 16 }}>📊</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Drop your comps here</div>
+                      <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>or click to browse</div>
+                      <div style={{ display: 'inline-block', padding: '10px 24px', background: 'var(--blue)', borderRadius: 10, fontSize: 13, fontWeight: 600, color: 'white' }}>
+                        Upload Excel →
+                      </div>
+                      <div style={{ marginTop: 20, fontSize: 11, color: 'var(--text3)', lineHeight: 1.7 }}>
+                        Sheet "Annualized_Panel" · company metrics by year<br />
+                        Your data never leaves this browser
+                      </div>
+                    </>}
+              </div>
+              <input id="xlsxIn" type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={e => handle(e.target.files[0])} />
+            </div>
+          </div>
         </div>
-        <div className="fade-up d2"
-          onDragOver={e => { e.preventDefault(); setDrag(true) }}
-          onDragLeave={() => setDrag(false)}
-          onDrop={e => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files[0]) }}
-          onClick={() => !loading && document.getElementById('xlsxIn').click()}
-          style={{ border: `2px dashed ${drag ? 'var(--blue)' : 'var(--border-h)'}`, borderRadius: 20, padding: '44px 32px', cursor: loading ? 'wait' : 'pointer', background: drag ? 'var(--blue-d)' : 'var(--bg1)', transition: 'all 0.2s ease', transform: drag ? 'scale(1.02)' : 'scale(1)' }}>
-          {loading
-            ? <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}><div className="spinner" style={{ width: 28, height: 28, border: '3px solid var(--bg3)', borderTopColor: 'var(--blue)' }} /><div style={{ color: 'var(--text2)', fontSize: 14 }}>Reading your data…</div></div>
-            : <><div style={{ fontSize: 34, marginBottom: 14 }}>📊</div><div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Drop your Excel here</div><div style={{ fontSize: 13, color: 'var(--text2)' }}>or click to browse</div><div style={{ marginTop: 18, fontSize: 11, color: 'var(--text3)' }}>Sheet "Annualized_Panel" · company metrics by year</div></>}
-        </div>
-        <input id="xlsxIn" type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={e => handle(e.target.files[0])} />
+      </div>
+
+      {/* Footer strip */}
+      <div style={{ borderTop: '1px solid var(--border)', padding: '14px 32px', display: 'flex', justifyContent: 'center', gap: 40 }}>
+        {['Pooled OLS', 'Ridge Regression', 'Fixed Effects', 'Walk-forward CV', 'AI Chat'].map(t => (
+          <span key={t} style={{ fontSize: 11, color: 'var(--text3)', letterSpacing: '0.08em' }}>{t}</span>
+        ))}
       </div>
     </div>
   )
@@ -289,6 +355,10 @@ function SetupScreen({ rawData, sheetName, onRun, onReset }) {
             {featureCols.map(f => { const on = features.includes(f); const rec = DEFAULT_FEATURES.includes(f); return <div key={f} className={`chip ${on ? 'on' : ''}`} onClick={() => setFeatures(p => p.includes(f) ? p.filter(x => x !== f) : [...p, f])} style={{ opacity: on ? 1 : 0.4 }}>{rec && <span style={{ fontSize: 9, opacity: 0.6 }}>★</span>}{f}</div> })}
           </div>
           <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>★ = recommended · Keep 4–7 variables for best results. The recommended variables (growth, margin, ROIC, scale, cyclicality, theme score) are fundamental drivers that work across different target multiples — they explain <em>why</em> companies trade at a premium or discount regardless of which multiple you predict.</div>
+        </div>
+
+        <div style={{ marginBottom: 20, padding: '14px 18px', background: 'var(--bg2)', borderRadius: 12, borderLeft: '3px solid var(--blue)', fontSize: 12, color: 'var(--text2)', lineHeight: 1.8 }}>
+          <strong style={{ color: 'var(--blue)' }}>What you'll get:</strong> A fair-value range for {client?.split(',')[0] || 'your client'} based on {obsCount} data points across {selCos.length} companies. Ranked against all peers. AI analyst ready to explain every number.
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
