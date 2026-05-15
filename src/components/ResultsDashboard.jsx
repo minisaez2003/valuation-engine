@@ -1,4 +1,4 @@
-import { useState, useMemo, useContext, createContext, Component, useRef } from 'react'
+import { useState, useMemo, useContext, createContext, Component, useRef, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { C as DARK, compShort } from '../constants.jsx'
 import { standardize, applyStd, removeOutliers, buildFixedEffects, ols, ridge, walkForwardCV, avg, computeRelativeMultiple } from '../math.js'
@@ -1147,22 +1147,29 @@ function AIChatbot({ config, result, isLight }) {
     setMessages(updated)
     setLoading(true)
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      // Try the backend proxy first (recommended setup), fall back to direct API call
+      // The proxy endpoint should be hosted at /api/chat by your deployment
+      const proxyUrl = (typeof window !== 'undefined' && window.VE_CHAT_PROXY) || '/api/chat'
+      const res = await fetch(proxyUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1024,
           system: systemPrompt,
           messages: updated.map(m => ({ role: m.role, content: m.content }))
         })
       })
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error('AI chat backend not set up yet. Deploy /api/chat endpoint (see README) to enable. The rest of the app works without it.')
+        }
+        throw new Error(`Chat error (${res.status}). Backend may not be configured.`)
+      }
       const data = await res.json()
-      if (data.error) throw new Error(data.error.message)
-      const reply = data.content?.[0]?.text || '(no response)'
+      if (data.error) throw new Error(data.error)
+      const reply = data.reply || data.content?.[0]?.text || '(no response)'
       setMessages(prev => [...prev, { role: 'assistant', content: reply }])
     } catch (e) {
-      setError(e.message)
+      setError(e.message || 'Could not reach chat service')
     }
     setLoading(false)
   }
@@ -1183,6 +1190,7 @@ function AIChatbot({ config, result, isLight }) {
       {/* Floating button */}
       <button
         onClick={() => setOpen(v => !v)}
+        className="ai-chat-fab"
         style={{
           position: 'fixed', bottom: 28, right: 28, zIndex: 500,
           width: 52, height: 52, borderRadius: '50%',
@@ -1200,7 +1208,7 @@ function AIChatbot({ config, result, isLight }) {
 
       {/* Chat panel */}
       {open && (
-        <div style={{
+        <div className="ai-chat-panel" style={{
           position: 'fixed', bottom: 90, right: 28, zIndex: 499,
           width: 380, height: 540, display: 'flex', flexDirection: 'column',
           background: panelBg, border: `1px solid ${borderCol}`,
@@ -2015,7 +2023,7 @@ export default function ResultsDashboard({ result, config, allRows, onBack, onRe
     <ThemeCtx.Provider value={C}>
       {isLight && <style>{lightCSS}</style>}
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: C.bg }}>
-        <div style={{ borderBottom: `1px solid ${C.border}`, padding: '14px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.bg1, position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.bg1, position: 'sticky', top: 0, zIndex: 100 }} className="header-pad">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', color: isLight ? 'rgb(96,0,29)' : C.blue, textTransform: 'uppercase' }}>ValuationEngine</span>
             <span style={{ width: 1, height: 14, background: C.border, display: 'inline-block' }} />
@@ -2032,7 +2040,7 @@ export default function ResultsDashboard({ result, config, allRows, onBack, onRe
             <button onClick={onReset} style={{ fontSize: 12, color: C.text3, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)' }}>Change file</button>
           </div>
         </div>
-        <div style={{ flex: 1, padding: '24px 28px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+        <div style={{ flex: 1 }} className="dashboard-pad results-max">
           <KPIRow result={result} method={method} useRelative={useRelative} showAdvanced={showAdvanced} onToggleAdvanced={() => setShowAdvanced(v => !v)} />
           <div className="tab-bar" style={{ marginBottom: 16 }}>
             {TABS.map(([id, label]) => <button key={id} className={`tab ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>{label}</button>)}

@@ -69,6 +69,57 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .reset-btn:hover{background:var(--amber-d)}
 .insight{padding:14px 16px;border-radius:12px;font-size:12px;color:var(--text2);line-height:1.8;margin-top:12px}
 .badge{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:8px;font-size:10px;font-weight:600;letter-spacing:0.06em}
+
+/* Responsive grid utilities */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+.dashboard-pad{padding:24px 28px}
+.setup-pad{padding:28px 28px}
+.upload-pad{padding:48px 32px}
+.header-pad{padding:14px 28px}
+.results-max{max-width:1200px;margin:0 auto;width:100%}
+.setup-max{max-width:1080px;margin:0 auto;width:100%}
+.hero-max{max-width:900px;width:100%}
+
+/* Mobile: < 768px */
+@media (max-width: 768px) {
+  body{font-size:14px}
+  .grid-2{grid-template-columns:1fr;gap:10px}
+  .grid-4{grid-template-columns:1fr 1fr;gap:8px}
+  .hero-grid{grid-template-columns:1fr;gap:32px}
+  .dashboard-pad{padding:14px 14px}
+  .setup-pad{padding:18px 14px}
+  .upload-pad{padding:24px 16px}
+  .header-pad{padding:10px 14px}
+  .glass{padding:16px}
+  .kpi{padding:12px;min-width:80px}
+  .kpi-val{font-size:18px}
+  .mcard{min-width:120px;padding:12px}
+  .chip{padding:6px 10px;font-size:11px}
+  .tab{padding:7px 11px;font-size:11px}
+  .run-btn{width:100%;padding:14px 24px;font-size:13px}
+  .sel{font-size:14px}
+  .slabel{font-size:9px}
+  .num-input{font-size:13px}
+  .header-pad>div{flex-wrap:wrap !important;gap:6px !important}
+  .header-pad span{font-size:10px !important}
+  .tab-bar{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .mobile-hide{display:none !important}
+  .mobile-stack{flex-direction:column !important;align-items:stretch !important}
+  .mobile-full{width:100% !important}
+  .recharts-wrapper{font-size:9px}
+  /* Chat panel: full width on mobile */
+  .ai-chat-panel{width:calc(100vw - 16px) !important;height:calc(100vh - 100px) !important;right:8px !important;bottom:80px !important;max-width:380px;max-height:540px}
+  .ai-chat-fab{bottom:16px !important;right:16px !important;width:48px !important;height:48px !important}
+}
+
+/* Small mobile: < 480px */
+@media (max-width: 480px) {
+  .grid-4{grid-template-columns:1fr}
+  h1{font-size:28px !important}
+  .upload-pad h1{font-size:28px !important}
+}
 `
 
 function StyleInject() {
@@ -108,9 +159,9 @@ function UploadZone({ onData }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Hero */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 32px' }}>
-        <div style={{ maxWidth: 900, width: '100%' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="upload-pad">
+        <div className="hero-max">
+          <div className="hero-grid">
             {/* Left: copy */}
             <div className="fade-up">
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', color: 'var(--blue)', textTransform: 'uppercase', marginBottom: 18 }}>
@@ -178,7 +229,7 @@ function UploadZone({ onData }) {
       </div>
 
       {/* Footer strip */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: '14px 32px', display: 'flex', justifyContent: 'center', gap: 40 }}>
+      <div style={{ borderTop: '1px solid var(--border)', padding: '14px 24px', display: 'flex', justifyContent: 'center', gap: 24, flexWrap: 'wrap' }}>
         {['Pooled OLS', 'Ridge Regression', 'Fixed Effects', 'Walk-forward CV', 'AI Chat'].map(t => (
           <span key={t} style={{ fontSize: 11, color: 'var(--text3)', letterSpacing: '0.08em' }}>{t}</span>
         ))}
@@ -267,7 +318,7 @@ function SetupScreen({ rawData, sheetName, onRun, onReset }) {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ borderBottom: '1px solid var(--border)', padding: '14px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg1)' }}>
+      <div style={{ borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg1)' }} className="header-pad">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', color: 'var(--blue)', textTransform: 'uppercase' }}>ValuationEngine</span>
           <span style={{ width: 1, height: 14, background: 'var(--border)', display: 'inline-block' }} />
@@ -275,13 +326,13 @@ function SetupScreen({ rawData, sheetName, onRun, onReset }) {
         </div>
         <button onClick={onReset} style={{ fontSize: 12, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)' }}>← Change file</button>
       </div>
-      <div style={{ flex: 1, padding: '28px 28px', maxWidth: 1080, margin: '0 auto', width: '100%' }}>
+      <div style={{ flex: 1 }} className="setup-pad setup-max">
         <div className="fade-up" style={{ marginBottom: 28 }}>
           <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Configure your model</div>
           <div style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 300 }}>Choose your settings — then run the regression to see results</div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+        <div className="grid-2" style={{ marginBottom: 14 }}>
           <div className="glass fade-up d1">
             <div className="slabel">Predict (Y)</div>
             <select className="sel" value={target} onChange={e => { setTarget(e.target.value); setFeatures(f => f.filter(x => x !== e.target.value)) }}>{targetCols.map(c => <option key={c} value={c}>{c}</option>)}</select>
