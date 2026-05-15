@@ -30,17 +30,33 @@ class TabErrorBoundary extends Component {
 }
 
 // ─── Light theme palette ──────────────────────────────────────────────────────
+// ─── Apollo-style light palette ───────────────────────────────────────────────
+// Deep navy, muted brass gold, cream, stone — institutional asset management aesthetic
 const LIGHT = {
-  bg: '#FFFFFF', bg1: '#F8F5F2', bg2: '#F0EBE3', bg3: 'rgb(219,204,189)',
-  border: 'rgba(96,0,29,0.1)', borderH: 'rgba(96,0,29,0.22)',
-  blue: 'rgb(24,78,98)', blueDim: 'rgba(24,78,98,0.1)',
-  green: 'rgb(24,78,98)', greenDim: 'rgba(24,78,98,0.08)',
-  red: 'rgb(96,0,29)', redDim: 'rgba(96,0,29,0.08)',
-  amber: 'rgb(96,0,29)', amberDim: 'rgba(96,0,29,0.06)',
-  text: '#1a1a1a', text2: '#4a4a4a', text3: '#888888',
-  grid: 'rgba(0,0,0,0.06)',
-  accent: 'rgb(195,222,231)', // light blue for highlights
-  burgundy: 'rgb(96,0,29)',
+  bg: '#F7F4EF',      // warm cream — not stark white
+  bg1: '#FFFFFF',     // card surfaces pure white
+  bg2: '#F0EBE1',     // slightly deeper cream for inputs/secondary
+  bg3: '#E4DDD1',     // stone for borders, dividers
+  border: 'rgba(10,25,49,0.1)',
+  borderH: 'rgba(10,25,49,0.2)',
+  blue: '#0A1931',    // deep navy — primary interactive
+  blueDim: 'rgba(10,25,49,0.07)',
+  green: '#1A4D2E',   // forest green — positive signal
+  greenDim: 'rgba(26,77,46,0.08)',
+  red: '#7A1C2E',     // deep crimson — negative signal
+  redDim: 'rgba(122,28,46,0.08)',
+  amber: '#8B6914',   // muted brass/gold — accent
+  amberDim: 'rgba(139,105,20,0.1)',
+  text: '#0A1931',    // near-black navy for body text
+  text2: '#4A5568',   // mid slate
+  text3: '#8A9AB0',   // light slate for labels
+  grid: 'rgba(10,25,49,0.05)',
+  // Apollo-specific extras
+  gold: '#B8A04A',    // the signature Apollo brass-gold accent
+  goldDim: 'rgba(184,160,74,0.12)',
+  navy: '#0A1931',
+  cream: '#F7F4EF',
+  stone: '#E4DDD1',
 }
 
 // Theme context so all components share current palette
@@ -1373,128 +1389,239 @@ function buildReportHTML({ config, result, allRows }) {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Valuation Analysis — ${clientShort}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,600;8..60,700&family=Inter:wght@300;400;500;600;700&display=swap');
-  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: 'Inter', -apple-system, sans-serif; color: #1a1a1a; background: #fff; line-height: 1.6; font-size: 11pt; }
-  .page { max-width: 8.5in; margin: 0 auto; padding: 0.7in 0.85in; min-height: 11in; position: relative; page-break-after: always; }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Apollo-style palette */
+  :root {
+    --navy: #0A1931;
+    --gold: #B8A04A;
+    --cream: #F7F4EF;
+    --stone: #E4DDD1;
+    --white: #FFFFFF;
+    --positive: #1A4D2E;
+    --negative: #7A1C2E;
+    --text: #0A1931;
+    --text2: #4A5568;
+    --text3: #8A9AB0;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: var(--text);
+    background: var(--cream);
+    line-height: 1.6;
+    font-size: 11pt;
+  }
+
+  .page {
+    max-width: 8.5in;
+    margin: 0 auto;
+    padding: 0.75in 0.9in;
+    min-height: 11in;
+    position: relative;
+    background: var(--white);
+    page-break-after: always;
+    border-left: 4px solid var(--navy);
+  }
   .page:last-child { page-break-after: auto; }
-  .page-num { position: absolute; bottom: 0.4in; right: 0.85in; font-size: 9pt; color: #999; }
-  .page-footer { position: absolute; bottom: 0.4in; left: 0.85in; font-size: 9pt; color: #999; letter-spacing: 0.08em; text-transform: uppercase; }
 
-  h1, h2, h3 { font-family: 'Source Serif 4', Georgia, serif; font-weight: 600; letter-spacing: -0.01em; }
-  h1 { font-size: 32pt; line-height: 1.1; margin-bottom: 16px; color: #0a1929; }
-  h2 { font-size: 18pt; margin-bottom: 14px; color: #0a1929; padding-bottom: 8px; border-bottom: 2px solid #0a1929; }
-  h3 { font-size: 13pt; margin: 22px 0 10px; color: #0a1929; }
-  p { margin-bottom: 12px; }
+  /* Header bar on each page */
+  .page-header-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--stone);
+    margin-bottom: 32px;
+  }
+  .firm-logo { font-size: 8pt; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--navy); }
+  .page-date { font-size: 8pt; color: var(--text3); }
 
-  .firm-mark { font-size: 9pt; letter-spacing: 0.25em; text-transform: uppercase; color: #0a1929; font-weight: 700; margin-bottom: 12px; }
-  .doc-type { font-size: 10pt; letter-spacing: 0.18em; text-transform: uppercase; color: #6b6b6b; margin-bottom: 80px; font-weight: 500; }
-  .cover-meta { position: absolute; bottom: 1in; left: 0.85in; right: 0.85in; padding-top: 18px; border-top: 1px solid #ccc; display: flex; justify-content: space-between; font-size: 9pt; color: #666; }
-  .cover-rule { width: 60px; height: 4px; background: #0a1929; margin: 28px 0; }
-  .cover-subtitle { font-size: 13pt; color: #4a4a4a; font-weight: 300; line-height: 1.5; max-width: 5in; margin-top: 18px; }
-  .cover-confidential { display: inline-block; padding: 4px 12px; background: #fde8ec; color: #9b1c2d; font-size: 8pt; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; border-radius: 3px; margin-top: 40px; }
+  .page-num {
+    position: absolute; bottom: 0.5in; right: 0.9in;
+    font-size: 8pt; color: var(--text3);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .page-num::before { content: ''; display: block; width: 20px; height: 1px; background: var(--stone); }
+  .page-footer {
+    position: absolute; bottom: 0.5in; left: 0.9in;
+    font-size: 8pt; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase;
+  }
+
+  /* Gold accent rule */
+  .gold-rule { width: 48px; height: 3px; background: var(--gold); margin: 20px 0 28px; }
+
+  h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 38pt; font-weight: 700; line-height: 1.05;
+    color: var(--navy); letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+  h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 17pt; font-weight: 600; color: var(--navy);
+    padding-bottom: 10px; border-bottom: 1px solid var(--stone);
+    margin-bottom: 20px; letter-spacing: -0.01em;
+  }
+  h2::before { content: ''; display: block; width: 28px; height: 2px; background: var(--gold); margin-bottom: 14px; }
+  h3 { font-size: 11pt; font-weight: 600; color: var(--navy); margin: 24px 0 10px; text-transform: uppercase; letter-spacing: 0.06em; font-size: 9pt; }
+  p { margin-bottom: 12px; color: var(--text2); }
+
+  /* Cover page */
+  .cover-eyebrow { font-size: 9pt; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; }
+  .cover-subtitle { font-size: 13pt; color: var(--text2); font-weight: 300; line-height: 1.6; max-width: 5in; margin-top: 20px; }
+  .cover-stamp {
+    display: inline-block; padding: 5px 14px;
+    border: 1px solid var(--navy); color: var(--navy);
+    font-size: 8pt; font-weight: 600; letter-spacing: 0.18em;
+    text-transform: uppercase; margin-top: 48px;
+  }
+  .cover-meta {
+    position: absolute; bottom: 0.9in; left: 0.9in; right: 0.9in;
+    padding-top: 16px; border-top: 1px solid var(--stone);
+    display: flex; justify-content: space-between; font-size: 9pt; color: var(--text3);
+  }
 
   /* Range block */
-  .range-block { padding: 24px 28px; background: #f8f6f2; border-left: 4px solid #0a1929; margin: 16px 0 24px; }
-  .range-label { font-size: 9pt; letter-spacing: 0.18em; text-transform: uppercase; color: #6b6b6b; margin-bottom: 8px; font-weight: 600; }
-  .range-value { font-family: 'Source Serif 4', Georgia, serif; font-size: 36pt; font-weight: 700; color: #0a1929; line-height: 1; margin-bottom: 10px; letter-spacing: -0.02em; }
-  .range-detail { font-size: 11pt; color: #4a4a4a; line-height: 1.7; }
-  .range-detail strong { color: #0a1929; }
-  .range-direction { display: inline-block; padding: 3px 11px; border-radius: 4px; font-size: 9pt; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-left: 6px; }
+  .range-block {
+    padding: 28px 32px; background: var(--navy);
+    margin: 20px 0 28px;
+  }
+  .range-label { font-size: 8pt; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; font-weight: 600; }
+  .range-value {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 42pt; font-weight: 700; color: var(--white);
+    line-height: 1; margin-bottom: 12px; letter-spacing: -0.02em;
+  }
+  .range-detail { font-size: 11pt; color: rgba(255,255,255,0.75); line-height: 1.7; }
+  .range-detail strong { color: var(--white); }
+  .range-direction {
+    display: inline-block; padding: 3px 10px;
+    font-size: 9pt; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    margin-left: 8px; border: 1px solid;
+  }
+  .dir-up { color: #6fcf97; border-color: #6fcf97; }
+  .dir-down { color: #eb5757; border-color: #eb5757; }
 
   /* KPI grid */
-  .kpi-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin: 18px 0; }
-  .kpi-card { padding: 14px 16px; border: 1px solid #e5e0d8; border-radius: 4px; }
-  .kpi-label { font-size: 8pt; letter-spacing: 0.14em; text-transform: uppercase; color: #888; margin-bottom: 6px; font-weight: 600; }
-  .kpi-value { font-family: 'Source Serif 4', Georgia, serif; font-size: 22pt; font-weight: 700; color: #0a1929; line-height: 1; }
-  .kpi-sub { font-size: 9pt; color: #999; margin-top: 4px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--stone); margin: 20px 0; border: 1px solid var(--stone); }
+  .kpi-card { padding: 16px 18px; background: var(--white); }
+  .kpi-label { font-size: 7.5pt; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; font-weight: 600; }
+  .kpi-value { font-family: 'Playfair Display', Georgia, serif; font-size: 22pt; font-weight: 700; color: var(--navy); line-height: 1; }
+  .kpi-sub { font-size: 8.5pt; color: var(--text3); margin-top: 5px; }
 
-  /* Thesis */
-  .thesis { padding: 20px 24px; background: #fff; border: 1px solid #e0dcd2; border-radius: 4px; margin: 12px 0 20px; }
-  .thesis p { font-size: 11.5pt; line-height: 1.8; color: #2a2a2a; }
-  .thesis strong { color: #0a1929; }
+  /* Thesis / quote block */
+  .thesis {
+    padding: 20px 24px; background: var(--cream);
+    border-left: 3px solid var(--gold); margin: 14px 0 22px;
+  }
+  .thesis p { font-size: 11pt; line-height: 1.85; color: var(--text); }
+  .thesis strong { color: var(--navy); font-weight: 600; }
 
   /* Tables */
   table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 10pt; }
-  th { text-align: left; padding: 10px 12px; background: #0a1929; color: white; font-weight: 600; font-size: 9pt; letter-spacing: 0.06em; text-transform: uppercase; }
-  td { padding: 9px 12px; border-bottom: 1px solid #e8e3d8; }
+  thead tr { background: var(--navy); }
+  th { text-align: left; padding: 10px 12px; color: rgba(255,255,255,0.9); font-weight: 600; font-size: 8pt; letter-spacing: 0.08em; text-transform: uppercase; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--stone); color: var(--text2); }
   tr:last-child td { border-bottom: none; }
-  .num { font-family: 'JetBrains Mono', monospace; font-size: 10pt; text-align: right; }
-  .sig { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 8pt; font-weight: 700; }
-  .sig-yes { background: #d4f4dd; color: #0a6b3f; }
-  .sig-no { background: #fde8ec; color: #9b1c2d; }
-  .row-client { background: #fff8e6; font-weight: 600; }
+  tbody tr:hover { background: var(--cream); }
+  .num { font-family: 'Courier New', monospace; font-size: 10pt; text-align: right; }
+  .sig { display: inline-block; padding: 2px 8px; font-size: 7.5pt; font-weight: 700; letter-spacing: 0.06em; }
+  .sig-yes { background: rgba(26,77,46,0.1); color: var(--positive); }
+  .sig-no { background: rgba(122,28,46,0.08); color: var(--negative); }
 
-  /* Caveat */
-  .caveat { padding: 12px 16px; background: #fdf4d6; border-left: 3px solid #d4a814; font-size: 9.5pt; color: #5a4a14; margin: 18px 0; line-height: 1.7; border-radius: 0 4px 4px 0; }
-  .caveat strong { color: #4a3a08; }
+  /* Methodology table */
+  .meta-table td:first-child { color: var(--text3); font-size: 9pt; width: 35%; }
+  .meta-table td:last-child { font-weight: 500; color: var(--navy); }
 
   /* Bar chart */
-  .bar-row { display: grid; grid-template-columns: 1.5fr 3fr 0.6fr; align-items: center; gap: 10px; padding: 5px 0; font-size: 9.5pt; }
-  .bar-row.client { font-weight: 700; }
-  .bar-name { color: #2a2a2a; }
-  .bar-track { position: relative; height: 18px; background: #f0ece4; border-radius: 2px; overflow: hidden; }
-  .bar-track .zero-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #999; }
-  .bar-fill { position: absolute; top: 0; bottom: 0; }
-  .bar-pct { font-family: 'JetBrains Mono', monospace; font-size: 9pt; text-align: right; }
+  .bar-row { display: grid; grid-template-columns: 1.6fr 3fr 0.65fr; align-items: center; gap: 10px; padding: 5px 0; font-size: 9.5pt; border-bottom: 1px solid rgba(228,221,209,0.5); }
+  .bar-row:last-child { border-bottom: none; }
+  .bar-row.client-row { font-weight: 700; color: var(--navy); background: rgba(184,160,74,0.06); margin: 0 -8px; padding: 5px 8px; }
+  .bar-name { color: var(--text2); font-size: 9pt; }
+  .bar-track { position: relative; height: 16px; background: var(--cream); }
+  .bar-track .zero-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--stone); }
+  .bar-fill { position: absolute; top: 2px; bottom: 2px; }
+  .bar-pct { font-family: 'Courier New', monospace; font-size: 9pt; text-align: right; }
 
-  /* Drivers section */
-  .driver-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 10pt; }
-  .driver-row:last-child { border-bottom: none; }
-  .driver-name { flex: 1; }
-  .driver-effect { color: #6b6b6b; font-size: 9.5pt; }
-
-  /* Print rules */
-  @media print {
-    body { font-size: 10pt; }
-    .page { padding: 0.6in 0.75in; }
-    .no-print { display: none; }
-    h2 { page-break-after: avoid; }
+  /* Caveat */
+  .caveat {
+    padding: 12px 16px; background: rgba(184,160,74,0.06);
+    border-left: 2px solid var(--gold); font-size: 9pt; color: var(--text2);
+    margin: 20px 0; line-height: 1.7;
   }
-  @page { size: letter; margin: 0; }
+  .caveat strong { color: var(--navy); }
 
-  /* Print button (hidden when printing) */
-  .print-bar { position: fixed; top: 16px; right: 16px; z-index: 1000; display: flex; gap: 10px; }
-  .print-btn { padding: 10px 18px; border-radius: 8px; border: none; background: #0a1929; color: white; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.2); }
-  .print-btn.secondary { background: white; color: #0a1929; border: 1px solid #0a1929; }
+  /* Disclosure */
+  .disclosure {
+    padding: 14px 18px; background: var(--cream);
+    border: 1px solid var(--stone); font-size: 8.5pt; color: var(--text3);
+    margin-top: 28px; line-height: 1.7;
+  }
+
+  /* Screen only */
+  .print-bar { position: fixed; top: 16px; right: 16px; z-index: 1000; display: flex; gap: 10px; font-family: 'Inter', sans-serif; }
+  .print-btn { padding: 10px 20px; border: none; background: var(--navy); color: white; font-size: 12px; font-weight: 600; cursor: pointer; letter-spacing: 0.04em; }
+  .print-btn.secondary { background: var(--white); color: var(--navy); border: 1px solid var(--navy); }
+  .print-btn:hover { opacity: 0.9; }
+
+  /* Print */
+  @media print {
+    body { background: white; }
+    .print-bar { display: none !important; }
+    .page { border-left: 3px solid var(--navy); padding: 0.65in 0.8in; }
+    h2 { page-break-after: avoid; }
+    .kpi-grid, .thesis, .range-block { page-break-inside: avoid; }
+    @page { size: letter; margin: 0; }
+  }
 </style>
 </head>
 <body>
-  <div class="print-bar no-print">
-    <button class="print-btn secondary" onclick="window.close()">Close</button>
-    <button class="print-btn" onclick="window.print()">Print / Save as PDF →</button>
+  <div class="print-bar">
+    <button class="print-btn secondary" onclick="window.close()">← Close</button>
+    <button class="print-btn" onclick="window.print()">Save as PDF →</button>
   </div>
 
   <!-- COVER PAGE -->
-  <div class="page">
-    <div class="firm-mark">TierOne M&A · Valuation Engine</div>
-    <div class="doc-type">Comparables Analysis Outlook</div>
-
-    <h1>${clientShort}<br/>Valuation Outlook</h1>
-    <div class="cover-rule"></div>
-    <div class="cover-subtitle">${useRelative ? 'Relative-to-sector regression analysis' : 'Regression-based comparable analysis'} of ${target}, anchored on ${latestYear || 'latest'} fundamentals across ${selectedCos?.length || 0} peer companies.</div>
-
-    <div class="cover-confidential">For internal use · Confidential</div>
-
-    <div class="cover-meta">
-      <div>
-        <strong style="color: #0a1929;">Prepared by</strong><br/>
-        TierOne M&A Advisory<br/>
-        Valuation Engine — automated analysis
+  <div class="page" style="background: var(--navy); border-left: none;">
+    <div style="height: 100%; display: flex; flex-direction: column;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 40px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 48px;">
+        <div style="font-size: 8.5pt; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold);">TierOne M&A Advisory</div>
+        <div style="font-size: 8pt; color: rgba(255,255,255,0.4); letter-spacing: 0.1em; text-transform: uppercase;">Confidential · For Internal Use</div>
       </div>
-      <div style="text-align: right;">
-        <strong style="color: #0a1929;">Date</strong><br/>
-        ${today}<br/>
-        Document version 1.0
+
+      <div style="flex: 1;">
+        <div style="font-size: 8.5pt; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; font-weight: 600;">Comparables Analysis Outlook</div>
+        <h1 style="color: white; font-size: 44pt; line-height: 1.0; margin-bottom: 0;">${clientShort}</h1>
+        <div style="width: 52px; height: 2px; background: var(--gold); margin: 24px 0 28px;"></div>
+        <div style="font-size: 14pt; color: rgba(255,255,255,0.65); font-weight: 300; line-height: 1.65; max-width: 5in;">
+          ${useRelative ? 'Relative-to-sector regression analysis' : 'Regression-based comparable analysis'} of <em style="color: rgba(255,255,255,0.85);">${target}</em>, anchored on ${latestYear || 'latest'} fundamentals across <strong style="color: white;">${selectedCos?.length || 0}</strong> peer companies.
+        </div>
+      </div>
+
+      <div style="padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: flex-end;">
+        <div>
+          <div style="font-size: 8pt; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 5px;">Prepared by</div>
+          <div style="font-size: 10pt; color: rgba(255,255,255,0.8);">TierOne M&A Advisory<br/>Valuation Engine</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 8pt; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 5px;">${today}</div>
+          <div style="font-size: 9pt; color: var(--gold); font-weight: 600; letter-spacing: 0.06em;">Document v1.0</div>
+        </div>
       </div>
     </div>
-    <div class="page-num">1</div>
+    <div class="page-num" style="color: rgba(255,255,255,0.3);">1</div>
   </div>
 
   <!-- EXECUTIVE SUMMARY -->
   <div class="page">
+    <div class="page-header-bar">
+      <div class="firm-logo">TierOne M&A · ValuationEngine</div>
+      <div class="page-date">${today}</div>
+    </div>
     <h2>Executive Summary</h2>
 
     <h3 style="margin-top: 0;">Model-implied valuation range</h3>
@@ -1503,8 +1630,8 @@ function buildReportHTML({ config, result, allRows }) {
       <div class="range-value">${fmtVal(range?.lo)} – ${fmtVal(range?.hi)}</div>
       <div class="range-detail">
         ${clientShort} is currently trading at <strong>${fmtVal(currentActual)}</strong>, implying
-        <span class="range-direction" style="background: ${gap > 0 ? '#d4f4dd' : '#fde8ec'}; color: ${directionColor};">${isFinite(upsidePct) ? (upsidePct > 0 ? '+' : '') + upsidePct.toFixed(0) + '% ' + direction : 'within range'}</span>
-        relative to the midpoint of our model's fair value range.
+        <span class="range-direction ${gap > 0 ? 'dir-up' : 'dir-down'}">${isFinite(upsidePct) ? (upsidePct > 0 ? '+' : '') + upsidePct.toFixed(0) + '% ' + direction : 'within range'}</span>
+        relative to the midpoint of the model's fair value range.
       </div>
     </div>
 
@@ -1538,15 +1665,15 @@ function buildReportHTML({ config, result, allRows }) {
     </div>
 
     <h3>Methodology snapshot</h3>
-    <table>
-      <tr><td style="width: 35%; color: #6b6b6b;">Target variable</td><td><strong>${target}</strong>${useRelative ? ' <em>(relative to sector median)</em>' : ''}</td></tr>
-      <tr><td style="color: #6b6b6b;">Regression method</td><td>${methodLabels[method] || method}</td></tr>
-      <tr><td style="color: #6b6b6b;">Independent variables</td><td>${validF.join(' · ')}</td></tr>
-      <tr><td style="color: #6b6b6b;">Sample size</td><td>${result?.n || 0} company-year observations</td></tr>
-      <tr><td style="color: #6b6b6b;">Coverage</td><td>${selectedCos?.length || 0} comparable companies</td></tr>
+    <table class="meta-table">
+      <tr><td>Target variable</td><td><strong>${target}</strong>${useRelative ? ' <em style="font-weight: 300;">(relative to sector median)</em>' : ''}</td></tr>
+      <tr><td>Regression method</td><td>${methodLabels[method] || method}</td></tr>
+      <tr><td>Independent variables</td><td>${validF.join(' · ')}</td></tr>
+      <tr><td>Sample size</td><td>${result?.n || 0} company-year observations</td></tr>
+      <tr><td>Coverage</td><td>${selectedCos?.length || 0} comparable companies</td></tr>
     </table>
 
-    <div class="caveat"><strong>Important:</strong> This analysis is a directional signal. Treat all figures as analytical inputs to support a broader valuation narrative — not as precise transaction values. Combine with DCF, precedent transaction analysis, and qualitative due diligence.</div>
+    <div class="caveat"><strong>Important:</strong> This analysis is a directional signal. Treat all figures as analytical inputs to support a broader valuation narrative — not as precise transaction values. Combine with DCF, precedent transactions, and qualitative due diligence.</div>
 
     <div class="page-footer">${clientShort} · Valuation Outlook</div>
     <div class="page-num">2</div>
@@ -1554,6 +1681,10 @@ function buildReportHTML({ config, result, allRows }) {
 
   <!-- ANALYSIS DETAIL -->
   <div class="page">
+    <div class="page-header-bar">
+      <div class="firm-logo">TierOne M&A · ValuationEngine</div>
+      <div class="page-date">${clientShort}</div>
+    </div>
     <h2>Analysis Detail</h2>
 
     <h3>What drives the multiple</h3>
@@ -1586,7 +1717,7 @@ function buildReportHTML({ config, result, allRows }) {
     <div style="margin: 14px 0;">
       ${companyRanking.slice(0, 14).map(d => {
         const w = Math.min(Math.abs(d.upsidePct), 100)
-        const isClientCls = d.isClient ? ' client' : ''
+        const isClientCls = d.isClient ? ' client-row' : ''
         const fillCol = d.isClient ? '#d4a814' : d.gap > 0 ? '#5a9a72' : '#c47a82'
         const leftPos = d.upsidePct > 0 ? 50 : 50 - w / 2
         return `
@@ -1612,6 +1743,10 @@ function buildReportHTML({ config, result, allRows }) {
 
   <!-- CONCLUSION -->
   <div class="page">
+    <div class="page-header-bar">
+      <div class="firm-logo">TierOne M&A · ValuationEngine</div>
+      <div class="page-date">${clientShort}</div>
+    </div>
     <h2>Recommendation & Next Steps</h2>
 
     <h3>How to use this analysis</h3>
@@ -1660,18 +1795,35 @@ function buildReportHTML({ config, result, allRows }) {
 function ShareAnalysisButton({ config, result, allRows, isLight }) {
   const C = isLight ? LIGHT : DARK
   const [generating, setGenerating] = useState(false)
+  // Track blob URL so we can revoke it after use
+  const blobUrlRef = useRef(null)
+
   const handle = () => {
     setGenerating(true)
     setTimeout(() => {
       try {
         const html = buildReportHTML({ config, result, allRows })
-        const w = window.open('', '_blank')
-        if (w) { w.document.write(html); w.document.close() }
+        // Use Blob URL — completely isolated from the parent page.
+        // This means window.print() in the new tab CANNOT affect the opener.
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+        // Revoke any previous blob to avoid memory leaks
+        if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
+        const url = URL.createObjectURL(blob)
+        blobUrlRef.current = url
+        // Open in new tab — fully isolated
+        const w = window.open(url, '_blank', 'noopener,noreferrer')
+        if (!w) {
+          // Popup blocked — fallback: trigger anchor download
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `${config?.clientCompany?.split(',')[0] || 'Valuation'}-Analysis.html`
+          a.click()
+        }
       } catch (e) {
         alert('Error generating report: ' + e.message)
       }
       setGenerating(false)
-    }, 100)
+    }, 120)
   }
   return (
     <button onClick={handle} disabled={generating}
@@ -1693,12 +1845,12 @@ function ShareAnalysisButton({ config, result, allRows, isLight }) {
 function ThemeToggle({ isLight, onToggle }) {
   return (
     <button onClick={onToggle}
-      title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
-      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: `1px solid ${isLight ? 'rgba(96,0,29,0.2)' : DARK.border}`, background: isLight ? 'rgb(219,204,189)' : DARK.bg2, color: isLight ? 'rgb(96,0,29)' : DARK.text2, fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all 0.2s', fontWeight: 500 }}>
+      title={isLight ? 'Switch to dark mode' : 'Switch to Apollo light mode'}
+      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: `1px solid ${isLight ? 'rgba(10,25,49,0.18)' : DARK.border}`, background: isLight ? '#FFFFFF' : DARK.bg2, color: isLight ? '#0A1931' : DARK.text2, fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all 0.2s', fontWeight: 500 }}>
       {isLight ? (
-        <><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="2.5" fill="currentColor"/><path d="M6 1v1M6 10v1M1 6h1M10 6h1M2.5 2.5l.7.7M8.8 8.8l.7.7M2.5 9.5l.7-.7M8.8 3.2l.7-.7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>Dark mode</>
+        <><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="2.5" fill="currentColor"/><path d="M6 1v1M6 10v1M1 6h1M10 6h1M2.5 2.5l.7.7M8.8 8.8l.7.7M2.5 9.5l.7-.7M8.8 3.2l.7-.7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>Dark</>
       ) : (
-        <><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10 6.5A4.5 4.5 0 015.5 2a4.5 4.5 0 100 9A4.5 4.5 0 0010 6.5z" stroke="currentColor" strokeWidth="1.2" fill="none"/></svg>Light mode</>
+        <><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" fill="white" stroke="currentColor" strokeWidth="1.2"/><path d="M3 4h6M3 6h4M3 8h5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.6"/></svg>Apollo</>
       )}
     </button>
   )
@@ -2003,20 +2155,33 @@ export default function ResultsDashboard({ result, config, allRows, onBack, onRe
   const methodLabels = { ols: 'Pooled OLS', ridge: 'Ridge', fe: 'Fixed Effects', fe_ridge: 'FE + Ridge' }
 
   // Inject light theme CSS variables when in light mode
+  // Apollo-style institutional light mode CSS overrides
   const lightCSS = isLight ? `
-    body { background: #FFFFFF !important; }
-    .chip { background: rgb(219,204,189) !important; border-color: rgba(96,0,29,0.15) !important; color: #4a4a4a !important; }
-    .chip.on { background: rgba(24,78,98,0.12) !important; border-color: rgb(24,78,98) !important; color: rgb(24,78,98) !important; }
-    .chip.on-green { background: rgba(24,78,98,0.1) !important; border-color: rgb(24,78,98) !important; color: rgb(24,78,98) !important; }
-    .chip.on-amber { background: rgba(96,0,29,0.1) !important; border-color: rgb(96,0,29) !important; color: rgb(96,0,29) !important; }
-    .tab { color: #888 !important; }
-    .tab.active { background: rgb(219,204,189) !important; color: rgb(96,0,29) !important; box-shadow: 0 1px 4px rgba(96,0,29,0.15) !important; }
-    .tab-bar { background: #F0EBE3 !important; }
-    .kpi { background: #F8F5F2 !important; border-color: rgba(96,0,29,0.1) !important; }
-    .num-input { background: #F0EBE3 !important; border-color: rgba(96,0,29,0.15) !important; color: #1a1a1a !important; }
-    .num-input.mod { border-color: rgb(96,0,29) !important; }
-    .run-btn { background: rgb(24,78,98) !important; }
-    .run-btn:hover { background: rgb(18,60,76) !important; box-shadow: 0 8px 24px rgba(24,78,98,0.3) !important; }
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap');
+    body { background: #F7F4EF !important; }
+    /* Typography upgrade in light mode */
+    .apollo-title { font-family: 'Playfair Display', 'Georgia', serif !important; }
+    /* Chips */
+    .chip { background: #E4DDD1 !important; border-color: rgba(10,25,49,0.12) !important; color: #4A5568 !important; }
+    .chip:hover { border-color: rgba(10,25,49,0.25) !important; color: #0A1931 !important; }
+    .chip.on { background: rgba(10,25,49,0.08) !important; border-color: #0A1931 !important; color: #0A1931 !important; }
+    .chip.on-green { background: rgba(26,77,46,0.08) !important; border-color: #1A4D2E !important; color: #1A4D2E !important; }
+    .chip.on-amber { background: rgba(184,160,74,0.12) !important; border-color: #8B6914 !important; color: #8B6914 !important; }
+    /* Tabs — gold underline active style */
+    .tab { color: #8A9AB0 !important; background: transparent !important; }
+    .tab:hover { color: #0A1931 !important; }
+    .tab.active { background: #FFFFFF !important; color: #0A1931 !important; font-weight: 600 !important; box-shadow: 0 1px 3px rgba(10,25,49,0.12) !important; }
+    .tab-bar { background: #F0EBE1 !important; border: 1px solid rgba(10,25,49,0.08) !important; }
+    /* KPI cards */
+    .kpi { background: #FFFFFF !important; border-color: rgba(10,25,49,0.1) !important; box-shadow: 0 1px 4px rgba(10,25,49,0.06) !important; }
+    /* Inputs */
+    .num-input { background: #F0EBE1 !important; border-color: rgba(10,25,49,0.15) !important; color: #0A1931 !important; }
+    .num-input.mod { border-color: #8B6914 !important; }
+    /* Buttons */
+    .run-btn { background: #0A1931 !important; }
+    .run-btn:hover { background: #142845 !important; box-shadow: 0 8px 24px rgba(10,25,49,0.25) !important; }
+    /* Charts — recharts grid lines */
+    .recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-vertical line { stroke: rgba(10,25,49,0.06) !important; }
   ` : ''
 
   return (
