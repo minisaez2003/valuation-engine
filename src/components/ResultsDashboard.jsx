@@ -1153,39 +1153,57 @@ function AIChatbot({ config, result, isLight }) {
 
   useEffect(() => { if (open) { scrollToBottom(); inputRef.current?.focus() } }, [messages, open])
 
+  const [apiKey, setApiKey] = useState('')
+  const [showKeyInput, setShowKeyInput] = useState(false)
+
   const send = async () => {
     const text = input.trim()
     if (!text || loading) return
+
+    // Need API key to proceed
+    const key = apiKey.trim()
+    if (!key) {
+      setShowKeyInput(true)
+      setError('Paste your Anthropic API key above to enable chat.')
+      return
+    }
+
     setInput('')
     setError(null)
     const newMsg = { role: 'user', content: text }
     const updated = [...messages, newMsg]
     setMessages(updated)
     setLoading(true)
+
     try {
-      // Try the backend proxy first (recommended setup), fall back to direct API call
-      // The proxy endpoint should be hosted at /api/chat by your deployment
-      const proxyUrl = (typeof window !== 'undefined' && window.VE_CHAT_PROXY) || '/api/chat'
-      const res = await fetch(proxyUrl, {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
         body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1024,
           system: systemPrompt,
           messages: updated.map(m => ({ role: m.role, content: m.content }))
         })
       })
+
       if (!res.ok) {
-        if (res.status === 404) {
-          throw new Error('AI chat backend not set up yet. Deploy /api/chat endpoint (see README) to enable. The rest of the app works without it.')
-        }
-        throw new Error(`Chat error (${res.status}). Backend may not be configured.`)
+        const errData = await res.json().catch(() => ({}))
+        const msg = errData?.error?.message || `API error (${res.status})`
+        if (res.status === 401) throw new Error('Invalid API key. Check it and try again.')
+        throw new Error(msg)
       }
+
       const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      const reply = data.reply || data.content?.[0]?.text || '(no response)'
+      const reply = data.content?.[0]?.text || '(no response)'
       setMessages(prev => [...prev, { role: 'assistant', content: reply }])
     } catch (e) {
-      setError(e.message || 'Could not reach chat service')
+      setError(e.message || 'Could not reach Anthropic API. Check your key and connection.')
     }
     setLoading(false)
   }
@@ -1252,8 +1270,47 @@ function AIChatbot({ config, result, isLight }) {
           </div>
 
           {/* Messages */}
+          {/* Messages area */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {messages.length === 0 && (
+
+            {/* API key input — shown until key is set */}
+            {(!apiKey || showKeyInput) && (
+              <div style={{ padding: '12px 14px', background: isLight ? '#F0EBE1' : '#1c2333', borderRadius: 12, border: `1px solid ${borderCol}`, marginBottom: 4 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: C.text, marginBottom: 6 }}>
+                  {apiKey ? '🔑 API key set — update below' : '🔑 Enter your Anthropic API key'}
+                </div>
+                <div style={{ fontSize: 10, color: C.text3, marginBottom: 8, lineHeight: 1.5 }}>
+                  Key stays in browser memory only. Never stored, never sent anywhere except Anthropic.
+                  Get one at <span style={{ color: accentCol }}>console.anthropic.com</span>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="password"
+                    placeholder="sk-ant-api03-..."
+                    defaultValue={apiKey}
+                    onChange={e => setApiKey(e.target.value)}
+                    style={{ flex: 1, padding: '7px 10px', borderRadius: 8, background: isLight ? '#fff' : '#0d1117', border: `1px solid ${borderCol}`, color: C.text, fontSize: 11, fontFamily: 'var(--mono)', outline: 'none' }}
+                    onKeyDown={e => { if (e.key === 'Enter' && apiKey.trim()) { setShowKeyInput(false); setError(null) } }}
+                  />
+                  <button
+                    onClick={() => { if (apiKey.trim()) { setShowKeyInput(false); setError(null) } }}
+                    style={{ padding: '7px 12px', borderRadius: 8, border: 'none', background: accentCol, color: 'white', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap' }}>
+                    {apiKey ? 'Update' : 'Save key'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Key set indicator */}
+            {apiKey && !showKeyInput && (
+              <div
+                onClick={() => setShowKeyInput(true)}
+                style={{ fontSize: 10, color: C.text3, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: '4px 0' }}>
+                <span style={{ color: '#10b981' }}>●</span> API key configured
+                <span style={{ color: accentCol, marginLeft: 4 }}>change</span>
+              </div>
+            )}
+            {messages.length === 0 && apiKey && (
               <div>
                 <div style={{ fontSize: 12, color: C.text2, lineHeight: 1.7, marginBottom: 14 }}>
                   Ask me anything about <strong style={{ color: C.text }}>{config?.target}</strong> or the valuation results for <strong style={{ color: accentCol }}>{config?.clientCompany?.split(',')[0]}</strong>. I have full context on the model.
