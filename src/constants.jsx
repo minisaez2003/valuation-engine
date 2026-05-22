@@ -1,11 +1,34 @@
-export const DEFAULT_Y = 'Approx EV/EBITDA'
+export const DEFAULT_Y = 'Approx EV/EBITDA'  // overridden dynamically if not found
+
+// Ordered priority lists — first match found in the file wins
+export const DEFAULT_Y_CANDIDATES = [
+  'Approx EV/EBITDA', 'EV / EBITDA (x)', 'EV/EBITDA', 'EV/EBITDA (x)',
+]
+
+export const DEFAULT_FEATURES_CANDIDATES = [
+  // Growth
+  ['Sales Growth (%)', 'Sales Growth (decimal)', 'Revenue Growth (%)', 'Sales Growth (%)'],
+  // Margin
+  ['EBITDA Margin (%)', 'EBITDA Margin (decimal)', 'EBITDA Margin'],
+  // ROIC
+  ['ROIC Proxy', 'ROIC Proxy (decimal)', 'ROIC (%)'],
+  // Scale
+  ['Scale / Network Advantage (1-5)'],
+  // Cyclicality
+  ['Cyclicality (1=Low,5=High)'],
+  // Theme
+  ['Theme Premium Score (1-5)'],
+]
+
 export const DEFAULT_FEATURES = [
   'Sales Growth (%)', 'EBITDA Margin (%)', 'ROIC Proxy',
   'Scale / Network Advantage (1-5)', 'Cyclicality (1=Low,5=High)', 'Theme Premium Score (1-5)'
 ]
+
 export const META_SKIP = new Set([
   'Include', 'Importance', 'Source Row', 'Source Slot',
-  'As-of Date', 'As-of Year', 'FactSet ID', 'Bucket', 'Theme Bucket'
+  'As-of Date', 'As-of Year', 'FactSet ID', 'Bucket', 'Theme Bucket',
+  'Year', 'Company', 'RBICS Industry Group', 'RBICS Sub-Industry', 'RBICS Sector',
 ])
 export const compShort = c =>
   c.replace(/,?\s*(Inc\.|Corp\.|Co\.|Ltd\.|LLC|Class\s+[A-Z]|Holdings|Companies|Enterprises)\.?/gi, '')

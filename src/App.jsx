@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import * as XLSX from 'xlsx'
-import { DEFAULT_Y, DEFAULT_FEATURES, META_SKIP, compShort } from './constants.jsx'
+import { DEFAULT_Y, DEFAULT_Y_CANDIDATES, DEFAULT_FEATURES, DEFAULT_FEATURES_CANDIDATES, META_SKIP, compShort } from './constants.jsx'
 import { toNum, isNumCol, standardize, removeOutliers, ols, ridge, buildFixedEffects, computeRelativeMultiple } from './math.js'
 import ResultsDashboard from './components/ResultsDashboard.jsx'
 
@@ -136,17 +136,35 @@ function StyleInject() {
 function UploadZone({ onData }) {
   const [drag, setDrag] = useState(false)
   const [loading, setLoading] = useState(false)
-  const handle = f => {
+  const [pendingData, setPendingData] = useState(null)
+  const [showWarning, setShowWarning] = useState(false)
+
+  const processFile = f => {
     if (!f) return
     setLoading(true)
     const r = new FileReader()
     r.onload = e => {
       const wb = XLSX.read(e.target.result, { type: 'array', cellDates: false })
-      const name = wb.SheetNames.includes('Annualized_Panel') ? 'Annualized_Panel' : wb.SheetNames[0]
+      const SKIP_SHEETS = /^__|^#|^Sheet\d*$|cache/i
+      const dataSheets = wb.SheetNames.filter(n => !SKIP_SHEETS.test(n))
+      const preferredNames = ['Annualized_Panel', 'Annualized_Used', 'Annualized', 'Panel', 'Data', 'Sheet1']
+      const name = preferredNames.find(p => wb.SheetNames.includes(p)) || dataSheets[0] || wb.SheetNames[0]
       const data = XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: null, raw: true })
-      setTimeout(() => { onData(data, name); setLoading(false) }, 200)
+      setTimeout(() => {
+        setPendingData({ data, name })
+        setLoading(false)
+        setShowWarning(true) // Show compliance warning before loading
+      }, 200)
     }
     r.readAsArrayBuffer(f)
+  }
+
+  const confirmAndLoad = () => {
+    if (pendingData) {
+      onData(pendingData.data, pendingData.name)
+      setShowWarning(false)
+      setPendingData(null)
+    }
   }
 
   const claims = [
@@ -158,15 +176,49 @@ function UploadZone({ onData }) {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+
+      {/* Compliance warning modal */}
+      {showWarning && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: 'var(--bg1)', border: '1px solid var(--border)', borderRadius: 20, padding: '32px 36px', maxWidth: 520, width: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
+            <div style={{ fontSize: 24, marginBottom: 14 }}>⚠️</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>Public Data Only</div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.9, marginBottom: 24 }}>
+              This tool is designed for use with <strong style={{ color: 'var(--text)' }}>publicly available market data only</strong>. Do not upload:
+              <ul style={{ marginTop: 10, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <li>Confidential client information</li>
+                <li>Non-public financial projections</li>
+                <li>Data subject to NDA or confidentiality agreement</li>
+                <li>Material non-public information (MNPI)</li>
+              </ul>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 24, padding: '10px 14px', background: 'var(--bg2)', borderRadius: 8, lineHeight: 1.7 }}>
+              By continuing you confirm this file contains only publicly available market information.
+            </div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button onClick={() => { setShowWarning(false); setPendingData(null) }}
+                style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                Cancel — choose different file
+              </button>
+              <button onClick={confirmAndLoad}
+                style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--blue)', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                I confirm — continue →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hero */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="upload-pad">
         <div className="hero-max">
           <div className="hero-grid">
             {/* Left: copy */}
             <div className="fade-up">
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', color: 'var(--blue)', textTransform: 'uppercase', marginBottom: 18 }}>
-                TierOne M&A · ValuationEngine
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', color: 'var(--blue)', textTransform: 'uppercase', marginBottom: 6 }}>
+                ValuationEngine
               </div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 20 }}>by Pablo Saez</div>
               <h1 style={{ fontSize: 42, fontWeight: 700, lineHeight: 1.1, marginBottom: 20, letterSpacing: '-0.02em' }}>
                 Stop guessing.<br />
                 <span style={{ color: 'var(--blue)' }}>Let the data</span><br />
@@ -193,7 +245,7 @@ function UploadZone({ onData }) {
               <div
                 onDragOver={e => { e.preventDefault(); setDrag(true) }}
                 onDragLeave={() => setDrag(false)}
-                onDrop={e => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files[0]) }}
+                onDrop={e => { e.preventDefault(); setDrag(false); processFile(e.dataTransfer.files[0]) }}
                 onClick={() => !loading && document.getElementById('xlsxIn').click()}
                 style={{
                   border: `2px dashed ${drag ? 'var(--blue)' : 'var(--border-h)'}`,
@@ -222,7 +274,7 @@ function UploadZone({ onData }) {
                       </div>
                     </>}
               </div>
-              <input id="xlsxIn" type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={e => handle(e.target.files[0])} />
+              <input id="xlsxIn" type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={e => processFile(e.target.files[0])} />
             </div>
           </div>
         </div>
@@ -244,12 +296,40 @@ function SetupScreen({ rawData, sheetName, onRun, onReset }) {
   const allCompanies = useMemo(() => [...new Set(rows.map(r => r._company).filter(Boolean))], [rows])
   const allYears = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
   const targetCols = useMemo(() => numCols.filter(c => !META_SKIP.has(c)), [numCols])
-  const [target, setTarget] = useState(DEFAULT_Y)
+
+  // Smart defaults — pick first candidate that exists in this file's columns
+  const smartDefaultY = useMemo(() =>
+    DEFAULT_Y_CANDIDATES.find(c => numCols.includes(c)) || targetCols[0] || DEFAULT_Y,
+    [numCols, targetCols]
+  )
+  const smartDefaultFeatures = useMemo(() => {
+    const picked = []
+    for (const group of DEFAULT_FEATURES_CANDIDATES) {
+      const match = group.find(c => numCols.includes(c))
+      if (match) picked.push(match)
+    }
+    // fallback: use DEFAULT_FEATURES if nothing matched (old file format)
+    return picked.length >= 3 ? picked : DEFAULT_FEATURES.filter(f => numCols.includes(f))
+  }, [numCols])
+
+  const [target, setTarget] = useState(() =>
+    DEFAULT_Y_CANDIDATES.find(c => numCols.includes(c)) || targetCols[0] || DEFAULT_Y
+  )
   const featureCols = useMemo(() => numCols.filter(c => !META_SKIP.has(c) && c !== target), [numCols, target])
+
   const [client, setClient] = useState(allCompanies[0] || '')
   const [selCos, setSelCos] = useState(allCompanies)
   const [yearRange, setYearRange] = useState([2018, 2025])
-  const [features, setFeatures] = useState(DEFAULT_FEATURES)
+  const [features, setFeatures] = useState(() => {
+    const picked = []
+    for (const group of DEFAULT_FEATURES_CANDIDATES) {
+      const match = group.find(c => numCols.includes(c))
+      if (match) picked.push(match)
+    }
+    return picked.length >= 3 ? picked : DEFAULT_FEATURES.filter(f => numCols.includes(f)).length >= 3
+      ? DEFAULT_FEATURES.filter(f => numCols.includes(f))
+      : numCols.slice(0, 6)
+  })
   const [method, setMethod] = useState('ols')
   const [filterOut, setFilterOut] = useState(true)
   const [useRelative, setUseRelative] = useState(false)
@@ -400,7 +480,7 @@ function SetupScreen({ rawData, sheetName, onRun, onReset }) {
         <div className="glass fade-up d4" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div className="slabel" style={{ margin: 0 }}>Independent variables X ({validF.length} selected)</div>
-            <button onClick={() => setFeatures(DEFAULT_FEATURES)} style={{ fontSize: 11, color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)' }}>Reset to recommended</button>
+            <button onClick={() => setFeatures(smartDefaultFeatures)} style={{ fontSize: 11, color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)' }}>Reset to recommended</button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
             {featureCols.map(f => { const on = features.includes(f); const rec = DEFAULT_FEATURES.includes(f); return <div key={f} className={`chip ${on ? 'on' : ''}`} onClick={() => setFeatures(p => p.includes(f) ? p.filter(x => x !== f) : [...p, f])} style={{ opacity: on ? 1 : 0.4 }}>{rec && <span style={{ fontSize: 9, opacity: 0.6 }}>★</span>}{f}</div> })}
@@ -416,6 +496,20 @@ function SetupScreen({ rawData, sheetName, onRun, onReset }) {
           <button className="run-btn" onClick={handleRun} disabled={running || obsCount < 5}>
             {running ? <><div className="spinner" />Running…</> : '▶ Run Regression'}
           </button>
+          <button
+            onClick={() => {
+              setTarget(smartDefaultY)
+              setFeatures(smartDefaultFeatures)
+              setMethod('ols')
+              setFilterOut(true)
+              setSelCos(allCompanies)
+              setYearRange([Math.min(...allYears), Math.max(...allYears)])
+              setTimeout(handleRun, 50)
+            }}
+            disabled={running || obsCount < 5}
+            style={{ padding: '12px 20px', borderRadius: 10, border: '1px solid var(--green)', background: 'var(--green-d, rgba(16,185,129,0.1))', color: 'var(--green)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 7 }}>
+            ⚡ Quick run — recommended settings
+          </button>
           <div style={{ fontSize: 13, color: 'var(--text3)' }}>{validF.length} variables · <span style={{ color: 'var(--text2)' }}>{obsCount} observations</span></div>
         </div>
         {warning && <div className="warn">⚠ {warning}</div>}
@@ -430,10 +524,82 @@ export default function App() {
   const [runResult, setRunResult] = useState(null)
 
   const handleData = useCallback((data, sheet) => {
-    setSheetName(sheet)
-    const withCalc = data.map(row => ({ ...row, 'EV/Sales': (toNum(row['EV ($mm)']) / toNum(row['Sales ($mm)'])) || null }))
-    const numCols = Object.keys(withCalc[0] || {}).filter(k => !META_SKIP.has(k) && k !== 'Company Name' && k !== 'Bucket' && k !== 'Theme Bucket' && isNumCol(withCalc, k))
-    const cleaned = withCalc.map(row => { const r = { _company: row['Company Name'] || '', _year: toNum(row['As-of Year']), _bucket: row['Bucket'] || '' }; for (const k of numCols) r[k] = toNum(row[k]); return r })
+    if (!data || data.length === 0) return
+    const headers = Object.keys(data[0] || {})
+
+    // ── Auto-detect key columns ──────────────────────────────────────────────
+    // Company name: try known variants
+    const companyCol = headers.find(h =>
+      /^company\s*name$/i.test(h) || /^company$/i.test(h) || /^firm$/i.test(h) || /^issuer$/i.test(h)
+    ) || headers.find(h => /company/i.test(h)) || headers[0]
+
+    // Year column: try known variants
+    const yearCol = headers.find(h =>
+      /^as.?of\s*year$/i.test(h) || /^year$/i.test(h) || /^fiscal.?year$/i.test(h) || /^fy$/i.test(h)
+    ) || headers.find(h => /year/i.test(h))
+
+    // Bucket column
+    const bucketCol = headers.find(h => /^bucket$/i.test(h)) || ''
+
+    // ── Build META_SKIP for this file ────────────────────────────────────────
+    const alwaysSkip = new Set([
+      'Include', 'Importance', 'Source Row', 'Source Slot', 'As-of Date',
+      'FactSet ID', 'Bucket', 'Theme Bucket', 'RBICS Industry Group',
+      'RBICS Sub-Industry', 'RBICS Sector',
+    ])
+    if (companyCol) alwaysSkip.add(companyCol)
+    if (yearCol) alwaysSkip.add(yearCol)
+    if (bucketCol) alwaysSkip.add(bucketCol)
+
+    // ── Normalise rows ───────────────────────────────────────────────────────
+    // Some files store percentages as decimals (0.07 instead of 7.0).
+    // Detect by checking if a "margin" or "growth" column has values < 1.5
+    const isDecimalCol = col => {
+      const vals = data.map(r => parseFloat(r[col])).filter(v => isFinite(v) && v !== 0)
+      if (!vals.length) return false
+      const allSmall = vals.every(v => Math.abs(v) < 2)
+      return allSmall && (/(decimal|pct|ratio)/i.test(col) || /margin|growth|roic|capex.?sales/i.test(col))
+    }
+
+    // ── Compute derived columns ──────────────────────────────────────────────
+    const withCalc = data.map(row => {
+      const out = { ...row }
+      // EV/Sales — try existing column first, then compute
+      if (!isFinite(parseFloat(out['EV / Sales (x)'])) && !isFinite(parseFloat(out['EV/Sales']))) {
+        const ev = parseFloat(out['EV ($mm)'] ?? out['Enterprise Value ($mm)'] ?? out['EV ($M)'])
+        const sales = parseFloat(out['Sales ($mm)'] ?? out['Revenue ($mm)'])
+        if (isFinite(ev) && isFinite(sales) && sales > 0) out['EV/Sales (calc)'] = ev / sales
+      }
+      // Approx EV/EBITDA — alias if needed
+      if (!isFinite(parseFloat(out['Approx EV/EBITDA'])) && isFinite(parseFloat(out['EV / EBITDA (x)']))) {
+        out['Approx EV/EBITDA'] = out['EV / EBITDA (x)']
+      }
+      // Normalise decimal columns to percentage for readability
+      for (const col of headers) {
+        if (isDecimalCol(col) && isFinite(parseFloat(out[col]))) {
+          const pctName = col.replace(/\(decimal\)/i, '(%)').replace(/\s*\(decimal\)\s*/i, ' (%)').trim()
+          if (pctName !== col) out[pctName] = parseFloat(out[col]) * 100
+        }
+      }
+      return out
+    })
+
+    // ── Detect numeric columns ───────────────────────────────────────────────
+    const numCols = Object.keys(withCalc[0] || {}).filter(k =>
+      !alwaysSkip.has(k) && isNumCol(withCalc, k)
+    )
+
+    // ── Clean rows with standardised _company / _year fields ────────────────
+    const cleaned = withCalc.map(row => {
+      const r = {
+        _company: String(row[companyCol] || '').trim(),
+        _year: toNum(row[yearCol]),
+        _bucket: String(row[bucketCol] || '').trim(),
+      }
+      for (const k of numCols) r[k] = toNum(row[k])
+      return r
+    }).filter(r => r._company && isFinite(r._year))
+
     setRawData({ rows: cleaned, numCols })
     setRunResult(null)
   }, [])

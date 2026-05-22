@@ -470,6 +470,99 @@ function ValuationSummary({ result, target, clientCompany, useRelative, allRows,
   )
 }
 
+// ─── Deal Story Card ──────────────────────────────────────────────────────────
+// The first thing an MD sees: client → where it is → where it should be → why
+function DealStoryCard({ result, target, clientCompany, useRelative, allRows, features, method, filterOutliers }) {
+  const C = useTheme()
+  const validF = features.filter(f => f !== target)
+  const meta = getTargetMeta(target)
+
+  const story = useMemo(() => {
+    const model = buildModel(allRows, target, features, filterOutliers, method, useRelative)
+    if (!model) return null
+    const clientRows = allRows.filter(r => r._company === clientCompany && isFinite(r[target]) && validF.every(f => isFinite(r[f]))).sort((a, b) => b._year - a._year)
+    if (!clientRows.length) return null
+    const latest = clientRows[0]
+    const rawPred = predict({ ...latest, _company: clientCompany }, model)
+    const yearVals = allRows.filter(r => r._year === latest._year && isFinite(r[target])).map(r => r[target]).sort((a, b) => a - b)
+    const sectorMed = yearVals[Math.floor(yearVals.length / 2)]
+    const absPred = useRelative && isFinite(sectorMed) ? rawPred + sectorMed : rawPred
+    const range = computeSmartRange(absPred, target, allRows)
+    const current = latest[target]
+    const gap = absPred - current
+    const upsidePct = Math.abs(current) > 0.1 ? ((absPred - current) / Math.abs(current)) * 100 : null
+    const topDriver = result?.featureImp?.find(f => f.sig)
+    const driverText = topDriver
+      ? `${topDriver.beta > 0 ? 'Higher' : 'Lower'} ${topDriver.name.split('(')[0].trim()} is the strongest driver`
+      : 'No single dominant driver identified'
+    const confidence = result.r2 > 0.55 ? 'high' : result.r2 > 0.35 ? 'moderate' : 'limited'
+    return { current, absPred, range, gap, upsidePct, sectorMed, topDriver, driverText, confidence, latestYear: latest._year }
+  }, [allRows, target, features, filterOutliers, method, useRelative, clientCompany, validF, result])
+
+  if (!story) return null
+  const fmt = v => formatValue(v, meta)
+  const clientShort = clientCompany?.split(',')[0]
+  const isUp = story.gap > 0
+  const signalCol = isUp ? C.green : C.red
+
+  return (
+    <div style={{ background: C.bg1, border: `1px solid ${C.border}`, borderRadius: 16, padding: '22px 26px', marginBottom: 16, position: 'relative', overflow: 'hidden' }}>
+      {/* Subtle background accent */}
+      <div style={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', background: signalCol, borderRadius: '16px 0 0 16px' }} />
+
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.text3, marginBottom: 14 }}>
+        Deal Summary · {clientShort} · {story.latestYear} fundamentals
+      </div>
+
+      {/* Three-line story */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1, background: C.border, borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+        {/* Where it is */}
+        <div style={{ padding: '18px 20px', background: C.bg2 }}>
+          <div style={{ fontSize: 9, color: C.text3, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8, fontWeight: 600 }}>Where it trades today</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: C.blue, letterSpacing: '-0.02em', marginBottom: 4 }}>{fmt(story.current)}</div>
+          {isFinite(story.sectorMed) && (
+            <div style={{ fontSize: 11, color: story.current > story.sectorMed ? C.green : C.text3 }}>
+              {story.current > story.sectorMed ? '▲ Premium' : '▼ Discount'} to {fmt(story.sectorMed)} sector median
+            </div>
+          )}
+        </div>
+
+        {/* Where it should be */}
+        <div style={{ padding: '18px 20px', background: C.bg2 }}>
+          <div style={{ fontSize: 9, color: C.text3, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8, fontWeight: 600 }}>Model fair value range</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: signalCol, letterSpacing: '-0.02em', marginBottom: 4 }}>
+            {fmt(story.range?.lo)}–{fmt(story.range?.hi)}
+          </div>
+          <div style={{ fontSize: 11, color: signalCol, fontWeight: 600 }}>
+            {isFinite(story.upsidePct) ? `${story.upsidePct > 0 ? '+' : ''}${story.upsidePct.toFixed(0)}% to midpoint` : '—'}
+            {' '}· {story.confidence} confidence
+          </div>
+        </div>
+
+        {/* Why */}
+        <div style={{ padding: '18px 20px', background: C.bg2 }}>
+          <div style={{ fontSize: 9, color: C.text3, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8, fontWeight: 600 }}>Primary driver</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 6, lineHeight: 1.4 }}>{story.driverText}</div>
+          {story.topDriver && (
+            <div style={{ fontSize: 10, color: C.text3 }}>
+              {story.topDriver.beta > 0 ? '↑ Positive' : '↓ Negative'} relationship · p = {story.topDriver.pVal < 0.01 ? '<0.01' : story.topDriver.pVal.toFixed(2)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* One-line takeaway */}
+      <div style={{ fontSize: 12, color: C.text2, lineHeight: 1.8 }}>
+        <strong style={{ color: C.text }}>{clientShort}</strong> is currently trading at <strong style={{ color: C.blue }}>{fmt(story.current)}</strong>.
+        {' '}The model estimates fair value at <strong style={{ color: signalCol }}>{fmt(story.range?.lo)}–{fmt(story.range?.hi)}</strong>,
+        implying a <strong style={{ color: signalCol }}>{story.upsidePct ? `${story.upsidePct > 0 ? '+' : ''}${story.upsidePct.toFixed(0)}%` : 'neutral'} {isUp ? 're-rating opportunity' : 'downside risk'}</strong>.
+        {' '}{story.driverText}.
+        {' '}<span style={{ color: C.text3 }}>({story.confidence} confidence · {result.n} observations)</span>
+      </div>
+    </div>
+  )
+}
+
 // ─── Tab: Overview ────────────────────────────────────────────────────────────
 function TabOverview({ result, clientCompany, useRelative, target, showAdvanced, allRows, features, method, filterOutliers }) {
   const C = useTheme()
@@ -486,6 +579,7 @@ function TabOverview({ result, clientCompany, useRelative, target, showAdvanced,
   }))
   return (
     <>
+      <DealStoryCard result={result} target={target} clientCompany={clientCompany} useRelative={useRelative} allRows={allRows} features={features} method={method} filterOutliers={filterOutliers} />
       <ValuationSummary result={result} target={target} clientCompany={clientCompany} useRelative={useRelative} allRows={allRows} features={features} method={method} filterOutliers={filterOutliers} />
       <ChartCard
         title="Model accuracy — predicted vs actual"
@@ -1646,7 +1740,7 @@ function buildReportHTML({ config, result, allRows }) {
   <div class="page" style="background: var(--navy); border-left: none;">
     <div style="height: 100%; display: flex; flex-direction: column;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 40px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 48px;">
-        <div style="font-size: 8.5pt; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold);">TierOne M&A Advisory</div>
+        <div style="font-size: 8.5pt; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold);">ValuationEngine</div>
         <div style="font-size: 8pt; color: rgba(255,255,255,0.4); letter-spacing: 0.1em; text-transform: uppercase;">Confidential · For Internal Use</div>
       </div>
 
@@ -1662,7 +1756,7 @@ function buildReportHTML({ config, result, allRows }) {
       <div style="padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: flex-end;">
         <div>
           <div style="font-size: 8pt; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 5px;">Prepared by</div>
-          <div style="font-size: 10pt; color: rgba(255,255,255,0.8);">TierOne M&A Advisory<br/>Valuation Engine</div>
+          <div style="font-size: 10pt; color: rgba(255,255,255,0.8);">ValuationEngine<br/>Valuation Engine</div>
         </div>
         <div style="text-align: right;">
           <div style="font-size: 8pt; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 5px;">${today}</div>
@@ -1676,7 +1770,7 @@ function buildReportHTML({ config, result, allRows }) {
   <!-- EXECUTIVE SUMMARY -->
   <div class="page">
     <div class="page-header-bar">
-      <div class="firm-logo">TierOne M&A · ValuationEngine</div>
+      <div class="firm-logo">ValuationEngine · by Pablo Saez</div>
       <div class="page-date">${today}</div>
     </div>
     <h2>Executive Summary</h2>
@@ -1739,7 +1833,7 @@ function buildReportHTML({ config, result, allRows }) {
   <!-- ANALYSIS DETAIL -->
   <div class="page">
     <div class="page-header-bar">
-      <div class="firm-logo">TierOne M&A · ValuationEngine</div>
+      <div class="firm-logo">ValuationEngine · by Pablo Saez</div>
       <div class="page-date">${clientShort}</div>
     </div>
     <h2>Analysis Detail</h2>
@@ -1801,7 +1895,7 @@ function buildReportHTML({ config, result, allRows }) {
   <!-- CONCLUSION -->
   <div class="page">
     <div class="page-header-bar">
-      <div class="firm-logo">TierOne M&A · ValuationEngine</div>
+      <div class="firm-logo">ValuationEngine · by Pablo Saez</div>
       <div class="page-date">${clientShort}</div>
     </div>
     <h2>Recommendation & Next Steps</h2>
@@ -1833,7 +1927,7 @@ function buildReportHTML({ config, result, allRows }) {
 
     <div style="margin-top: 60px; padding-top: 18px; border-top: 1px solid #ddd; font-size: 9pt; color: #999; display: flex; justify-content: space-between;">
       <div>
-        TierOne M&A Advisory<br/>
+        ValuationEngine<br/>
         Valuation Engine — automated comparables analysis
       </div>
       <div style="text-align: right;">
