@@ -1198,40 +1198,95 @@ function TabTechnical({ result, method, target }) {
 }
 
 // ─── AI Chatbot ───────────────────────────────────────────────────────────────
-function buildSystemPrompt(config, result) {
+function buildSystemPrompt(config, result, allRows) {
   const { target, useRelative, clientCompany, features, method, selectedCos } = config
   const validF = features?.filter(f => f !== target) || []
-  const topDrivers = result?.featureImp?.slice(0, 3).map(f => `${f.name} (${f.sig ? 'significant' : 'weak'})`).join(', ') || 'unknown'
-  const r2 = result?.r2?.toFixed(3) || 'unknown'
-  const se = result?.se?.toFixed(2) || 'unknown'
-  const n = result?.n || 'unknown'
   const methodLabels = { ols: 'Pooled OLS', ridge: 'Ridge (α=5)', fe: 'Fixed Effects OLS', fe_ridge: 'Fixed Effects + Ridge' }
+  const r2 = result?.r2?.toFixed(3) || '?'
+  const se = result?.se?.toFixed(2) || '?'
+  const meta = getTargetMeta(target)
+  const fmt = v => isFinite(v) ? formatValue(v, meta) : '?'
 
-  return `You are a senior M&A analyst embedded inside a regression-based valuation tool called ValuationEngine. You help deal teams interpret statistical results in plain English.
+  // Compute actual valuation numbers so the AI can see them
+  let valuationSection = ''
+  try {
+    const model = buildModel(allRows, target, features, config.filterOutliers, method, useRelative)
+    if (model) {
+      const clientRows = allRows.filter(r => r._company === clientCompany && isFinite(r[target]) && validF.every(f => isFinite(r[f]))).sort((a, b) => b._year - a._year)
+      if (clientRows.length) {
+        const latest = clientRows[0]
+        const rawPred = predict({ ...latest, _company: clientCompany }, model)
+        const yearVals = allRows.filter(r => r._year === latest._year && isFinite(r[target])).map(r => r[target]).sort((a, b) => a - b)
+        const sectorMed = yearVals[Math.floor(yearVals.length / 2)]
+        const absPred = useRelative && isFinite(sectorMed) ? rawPred + sectorMed : rawPred
+        const range = computeSmartRange(absPred, target, allRows)
+        const current = latest[target]
+        const gap = absPred - current
+        const upsidePct = Math.abs(current) > 0.1 ? ((absPred - current) / Math.abs(current) * 100).toFixed(0) : '?'
+        const inRange = current >= range?.lo && current <= range?.hi
 
-CURRENT MODEL CONTEXT:
-- Client company: ${clientCompany}
-- Target variable: ${target}${useRelative ? ' (relative to sector median — removing macro noise)' : ' (absolute)'}
+        // Peer ranking
+        const companies = [...new Set(allRows.map(r => r._company).filter(Boolean))]
+        const peerRows = []
+        for (const co of companies) {
+          const lr = allRows.filter(r => r._company === co && isFinite(r[target]) && validF.every(f => isFinite(r[f]))).sort((a, b) => b._year - a._year)[0]
+          if (!lr) continue
+          const yv = allRows.filter(r => r._year === lr._year && isFinite(r[target])).map(r => r[target]).sort((a, b) => a - b)
+          const sm = yv[Math.floor(yv.length / 2)]
+          const rp = predict({ ...lr, _company: co }, model)
+          const ap = useRelative ? rp + sm : rp
+          const act = lr[target]
+          const denom = Math.max(Math.abs(act), 0.5)
+          peerRows.push({ co: compShort(co), upside: ((ap - act) / denom * 100), isClient: co === clientCompany })
+        }
+        peerRows.sort((a, b) => b.upside - a.upside)
+        const clientRank = peerRows.findIndex(r => r.isClient) + 1
+
+        valuationSection = `
+ACTUAL VALUATION RESULTS (use these in your answers):
+- Client: ${clientCompany?.split(',')[0]}
+- Current ${target}: ${fmt(current)}
+- Model fair value range: ${fmt(range?.lo)} – ${fmt(range?.hi)}
+- Model point estimate: ${fmt(absPred)}
+- Implied upside/downside: ${upsidePct}% ${gap > 0 ? '(undervalued)' : '(overvalued)'}
+- Already in range: ${inRange ? 'YES — currently trading within fair value range' : 'NO'}
+- Sector median (${latest._year}): ${fmt(sectorMed)}
+- Peer ranking: #${clientRank} of ${peerRows.length} by model-implied upside
+- Year of data used: ${latest._year}
+- Top peers by upside: ${peerRows.slice(0, 3).map(p => `${p.co} (${p.upside > 0 ? '+' : ''}${p.upside.toFixed(0)}%)`).join(', ')}
+`
+      }
+    }
+  } catch (e) {
+    valuationSection = '\n(Could not compute valuation details for this session)\n'
+  }
+
+  const topDrivers = result?.featureImp?.slice(0, 5).map(f =>
+    `${f.name}: ${f.beta > 0 ? 'higher → higher multiple' : 'higher → lower multiple'} (${f.sig ? 'statistically significant' : 'weak signal'})`
+  ).join('\n  ') || 'unknown'
+
+  return `You are a senior M&A analyst embedded inside ValuationEngine, a regression-based valuation tool. You help deal teams interpret results in plain English. Be concise — max 3-4 sentences per answer unless asked to elaborate.
+${valuationSection}
+MODEL DETAILS:
+- Target variable: ${target}${useRelative ? ' (relative to sector median)' : ' (absolute)'}
 - Method: ${methodLabels[method] || method}
-- Features used: ${validF.join(', ')}
+- R² = ${r2} (${parseFloat(r2) > 0.55 ? 'strong fit' : parseFloat(r2) > 0.35 ? 'moderate fit' : 'limited fit'})
+- Typical prediction error: ±${se}
+- Observations: ${result?.n || '?'} company-year data points
 - Comparables: ${selectedCos?.length || 'all'} companies
-- Model fit: R² = ${r2} (${parseFloat(r2) > 0.55 ? 'strong' : parseFloat(r2) > 0.35 ? 'moderate' : 'limited'} explanatory power)
-- Typical prediction error: ±${se}x
-- Training observations: ${n}
-- Top drivers: ${topDrivers}
+- Variables used: ${validF.join(', ')}
 
-YOUR ROLE:
-- Translate statistics into deal language. No jargon without explanation.
-- Be direct and honest about model limitations. Never overstate precision.
-- Answer questions about why a company is valued the way it is, what drives premiums, what the range means, how to use this in a pitch.
-- When asked about a specific company, reference what you know from the model context.
-- Keep responses concise — this is a fast-moving deal environment.
-- If asked something outside your context (e.g. specific news), say you don't have that data.
+KEY DRIVERS (ranked by statistical strength):
+  ${topDrivers}
 
-IMPORTANT: This is a private internal tool. All data stays in this session. Be candid and specific.`
+YOUR RULES:
+- You CAN see the results above — use them to give specific, numbers-based answers.
+- Be direct. Use deal language, not academic language.
+- Never make up numbers not in the context above.
+- If the model confidence is limited, say so honestly.`
 }
 
-function AIChatbot({ config, result, isLight }) {
+function AIChatbot({ config, result, allRows, isLight }) {
   const C = isLight ? LIGHT : DARK
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([])
@@ -1241,7 +1296,7 @@ function AIChatbot({ config, result, isLight }) {
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
-  const systemPrompt = useMemo(() => buildSystemPrompt(config, result), [config, result])
+  const systemPrompt = useMemo(() => buildSystemPrompt(config, result, allRows), [config, result, allRows])
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
 
@@ -1315,23 +1370,33 @@ function AIChatbot({ config, result, isLight }) {
 
   return (
     <>
-      {/* Floating button */}
+      {/* Floating AI button — with label so it's visible */}
       <button
         onClick={() => setOpen(v => !v)}
         className="ai-chat-fab"
         style={{
           position: 'fixed', bottom: 28, right: 28, zIndex: 500,
-          width: 52, height: 52, borderRadius: '50%',
-          background: accentCol, border: 'none',
-          boxShadow: `0 4px 20px ${accentCol}55`,
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'all 0.2s ease', transform: open ? 'scale(0.9)' : 'scale(1)'
+          height: 48, borderRadius: 24,
+          padding: open ? '0 16px' : '0 18px',
+          background: open ? (isLight ? '#4A5568' : '#374151') : accentCol,
+          border: 'none',
+          boxShadow: open ? 'none' : `0 4px 24px ${accentCol}66, 0 0 0 0 ${accentCol}`,
+          cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 8,
+          transition: 'all 0.25s ease',
+          animation: open ? 'none' : 'chatPulse 2.5s ease-in-out infinite',
         }}
         title="Ask the AI analyst"
       >
         {open
-          ? <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 2l14 14M16 2L2 16" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
-          : <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M18 10c0 4.418-3.582 8-8 8a7.97 7.97 0 01-4-.01L2 19l1.01-4A8 8 0 1118 10z" stroke="white" strokeWidth="1.8" fill="none" strokeLinejoin="round"/><circle cx="7" cy="10" r="1" fill="white"/><circle cx="10" cy="10" r="1" fill="white"/><circle cx="13" cy="10" r="1" fill="white"/></svg>}
+          ? <>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 2l12 12M14 2L2 14" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg>
+              <span style={{ color: 'white', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)' }}>Close</span>
+            </>
+          : <>
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M18 10c0 4.418-3.582 8-8 8a7.97 7.97 0 01-4-.01L2 19l1.01-4A8 8 0 1118 10z" stroke="white" strokeWidth="1.8" fill="none" strokeLinejoin="round"/><circle cx="7" cy="10" r="1" fill="white"/><circle cx="10" cy="10" r="1" fill="white"/><circle cx="13" cy="10" r="1" fill="white"/></svg>
+              <span style={{ color: 'white', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', whiteSpace: 'nowrap' }}>Ask AI Analyst</span>
+            </>}
       </button>
 
       {/* Chat panel */}
@@ -2375,7 +2440,7 @@ export default function ResultsDashboard({ result, config, allRows, onBack, onRe
           </div>
         </div>
       </div>
-      <AIChatbot config={config} result={result} isLight={isLight} />
+      <AIChatbot config={config} result={result} allRows={filteredAllRows} isLight={isLight} />
     </ThemeCtx.Provider>
   )
 }

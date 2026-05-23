@@ -21,6 +21,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:2px}
+@keyframes chatPulse { 0%,100%{box-shadow:0 4px 24px var(--blue,#3b82f6)66,0 0 0 0 var(--blue,#3b82f6)44} 50%{box-shadow:0 4px 24px var(--blue,#3b82f6)88,0 0 0 8px transparent} }
+@keyframes tickerScroll { from{transform:translateX(0)} to{transform:translateX(-50%)} }
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 .fade-up{animation:fadeUp 0.4s ease forwards}
@@ -175,33 +177,58 @@ function UploadZone({ onData }) {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden', background: '#060810' }}>
+
+      {/* Wall Street background — animated grid + glow */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
+        {/* Grid lines */}
+        <svg width="100%" height="100%" style={{ position: 'absolute', inset: 0, opacity: 0.07 }}>
+          <defs>
+            <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#3b82f6" strokeWidth="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)" />
+        </svg>
+        {/* Blue glow top-left */}
+        <div style={{ position: 'absolute', top: '-20%', left: '-10%', width: '60%', height: '70%', background: 'radial-gradient(ellipse, rgba(59,130,246,0.12) 0%, transparent 70%)', borderRadius: '50%' }} />
+        {/* Gold glow bottom-right */}
+        <div style={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '50%', height: '60%', background: 'radial-gradient(ellipse, rgba(184,160,74,0.08) 0%, transparent 70%)', borderRadius: '50%' }} />
+        {/* Animated ticker-style numbers — purely decorative */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 36, background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', gap: 48, fontSize: 11, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,0.2)', whiteSpace: 'nowrap', animation: 'tickerScroll 30s linear infinite' }}>
+            {['EV/EBITDA 12.4x ▲', 'EV/Sales 1.8x ▼', 'R² 0.61 —', 'EBITDA Margin 18.2%', 'Upside +34%', 'Peers 20', 'ROIC 14.3%', 'Growth 8.1%', 'EV/EBITDA 12.4x ▲', 'EV/Sales 1.8x ▼', 'R² 0.61 —', 'EBITDA Margin 18.2%'].map((t, i) => (
+              <span key={i}>{t}</span>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Compliance warning modal */}
       {showWarning && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ background: 'var(--bg1)', border: '1px solid var(--border)', borderRadius: 20, padding: '32px 36px', maxWidth: 520, width: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}>
-            <div style={{ fontSize: 24, marginBottom: 14 }}>⚠️</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>Public Data Only</div>
-            <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.9, marginBottom: 24 }}>
-              This tool is designed for use with <strong style={{ color: 'var(--text)' }}>publicly available market data only</strong>. Do not upload:
-              <ul style={{ marginTop: 10, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: '#111520', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '32px 36px', maxWidth: 520, width: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.8)' }}>
+            <div style={{ fontSize: 28, marginBottom: 14 }}>⚠️</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: 'white', marginBottom: 14 }}>Public Data Only</div>
+            <div style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.9, marginBottom: 24 }}>
+              This tool is designed for use with <strong style={{ color: 'white' }}>publicly available market data only</strong>. Do not upload:
+              <ul style={{ marginTop: 10, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <li>Confidential client information</li>
                 <li>Non-public financial projections</li>
                 <li>Data subject to NDA or confidentiality agreement</li>
                 <li>Material non-public information (MNPI)</li>
               </ul>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 24, padding: '10px 14px', background: 'var(--bg2)', borderRadius: 8, lineHeight: 1.7 }}>
+            <div style={{ fontSize: 11, color: '#475569', marginBottom: 24, padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 8, lineHeight: 1.7 }}>
               By continuing you confirm this file contains only publicly available market information.
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
               <button onClick={() => { setShowWarning(false); setPendingData(null) }}
-                style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text2)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                Cancel — choose different file
+                style={{ flex: 1, padding: '13px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#94a3b8', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                Cancel
               </button>
               <button onClick={confirmAndLoad}
-                style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', background: 'var(--blue)', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                style={{ flex: 1, padding: '13px', borderRadius: 10, border: 'none', background: '#3b82f6', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                 I confirm — continue →
               </button>
             </div>
@@ -209,38 +236,46 @@ function UploadZone({ onData }) {
         </div>
       )}
 
-      {/* Hero */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="upload-pad">
-        <div className="hero-max">
+      {/* Main hero */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1, padding: '48px 32px 80px' }}>
+        <div style={{ maxWidth: 1000, width: '100%' }}>
           <div className="hero-grid">
-            {/* Left: copy */}
+            {/* Left: epic copy */}
             <div className="fade-up">
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', color: 'var(--blue)', textTransform: 'uppercase', marginBottom: 6 }}>
-                ValuationEngine
+              {/* Badge */}
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 20, border: '1px solid rgba(59,130,246,0.4)', background: 'rgba(59,130,246,0.08)', marginBottom: 28 }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', boxShadow: '0 0 8px #3b82f6' }} />
+                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.14em', color: '#3b82f6', textTransform: 'uppercase' }}>ValuationEngine · by Pablo Saez</span>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 20 }}>by Pablo Saez</div>
-              <h1 style={{ fontSize: 42, fontWeight: 700, lineHeight: 1.1, marginBottom: 20, letterSpacing: '-0.02em' }}>
-                Stop guessing.<br />
-                <span style={{ color: 'var(--blue)' }}>Let the data</span><br />
-                set the range.
+
+              <h1 style={{ fontSize: 52, fontWeight: 800, lineHeight: 1.05, marginBottom: 24, letterSpacing: '-0.03em', color: 'white' }}>
+                The future of<br />
+                <span style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #818cf8 50%, #60a5fa 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>M&A valuation</span><br />
+                is statistical.
               </h1>
-              <p style={{ fontSize: 16, color: 'var(--text2)', lineHeight: 1.8, marginBottom: 28, fontWeight: 300 }}>
-                Regression-based comparable analysis that tells you <em>which</em> companies are mispriced and <em>why</em> — in language you can take into a room.
+
+              <p style={{ fontSize: 15, color: '#64748b', lineHeight: 1.85, marginBottom: 36, maxWidth: 440 }}>
+                Regression-based comparable analysis. Tell your client <em style={{ color: '#94a3b8' }}>exactly</em> which companies are mispriced, why, and by how much — in under 60 seconds.
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 36 }}>
-                {claims.map(({ icon, text }) => (
-                  <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text2)' }}>
-                    <span style={{ fontSize: 16 }}>{icon}</span>
-                    {text}
+
+              {/* Stats row */}
+              <div style={{ display: 'flex', gap: 28, marginBottom: 36, flexWrap: 'wrap' }}>
+                {[['60s', 'To valuation range'], ['4', 'Regression methods'], ['100%', 'Browser-private']].map(([val, label]) => (
+                  <div key={label}>
+                    <div style={{ fontSize: 26, fontWeight: 800, color: 'white', letterSpacing: '-0.02em', lineHeight: 1 }}>{val}</div>
+                    <div style={{ fontSize: 11, color: '#475569', marginTop: 4, letterSpacing: '0.04em' }}>{label}</div>
                   </div>
                 ))}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.7, padding: '10px 14px', background: 'var(--bg2)', borderRadius: 10, borderLeft: '3px solid var(--blue)' }}>
-                Built for deal teams who need to move fast and defend their numbers.
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {['OLS · Ridge · Fixed Effects', 'AI Analyst built-in', 'Apollo-style reports', 'Public data only'].map(t => (
+                  <span key={t} style={{ padding: '5px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: '#64748b', background: 'rgba(255,255,255,0.03)' }}>{t}</span>
+                ))}
               </div>
             </div>
 
-            {/* Right: upload */}
+            {/* Right: upload card */}
             <div className="fade-up d2">
               <div
                 onDragOver={e => { e.preventDefault(); setDrag(true) }}
@@ -248,28 +283,32 @@ function UploadZone({ onData }) {
                 onDrop={e => { e.preventDefault(); setDrag(false); processFile(e.dataTransfer.files[0]) }}
                 onClick={() => !loading && document.getElementById('xlsxIn').click()}
                 style={{
-                  border: `2px dashed ${drag ? 'var(--blue)' : 'var(--border-h)'}`,
-                  borderRadius: 24, padding: '52px 36px',
+                  border: `1.5px dashed ${drag ? '#3b82f6' : 'rgba(255,255,255,0.12)'}`,
+                  borderRadius: 24, padding: '44px 32px',
                   cursor: loading ? 'wait' : 'pointer',
-                  background: drag ? 'var(--blue-d)' : 'var(--bg1)',
+                  background: drag ? 'rgba(59,130,246,0.06)' : 'rgba(255,255,255,0.03)',
+                  backdropFilter: 'blur(12px)',
                   transition: 'all 0.2s ease',
                   transform: drag ? 'scale(1.02)' : 'scale(1)',
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  position: 'relative',
+                  boxShadow: drag ? '0 0 40px rgba(59,130,246,0.2)' : 'inset 0 1px 0 rgba(255,255,255,0.06)',
                 }}>
                 {loading
                   ? <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-                      <div className="spinner" style={{ width: 32, height: 32, border: '3px solid var(--bg3)', borderTopColor: 'var(--blue)' }} />
-                      <div style={{ color: 'var(--text2)', fontSize: 14 }}>Reading your data…</div>
+                      <div style={{ width: 40, height: 40, border: '3px solid rgba(255,255,255,0.08)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                      <div style={{ color: '#64748b', fontSize: 14 }}>Reading your data…</div>
                     </div>
                   : <>
-                      <div style={{ fontSize: 42, marginBottom: 16 }}>📊</div>
-                      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Drop your comps here</div>
-                      <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20 }}>or click to browse</div>
-                      <div style={{ display: 'inline-block', padding: '10px 24px', background: 'var(--blue)', borderRadius: 10, fontSize: 13, fontWeight: 600, color: 'white' }}>
-                        Upload Excel →
+                      {/* Icon */}
+                      <div style={{ width: 64, height: 64, borderRadius: 20, background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(99,102,241,0.1))', border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: 28 }}>📊</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: 'white', marginBottom: 8 }}>Drop your comps file</div>
+                      <div style={{ fontSize: 13, color: '#64748b', marginBottom: 24 }}>Excel · .xlsx or .xls</div>
+                      <div style={{ display: 'inline-block', padding: '12px 32px', background: '#3b82f6', borderRadius: 12, fontSize: 13, fontWeight: 700, color: 'white', boxShadow: '0 4px 16px rgba(59,130,246,0.4)', letterSpacing: '0.02em' }}>
+                        Upload file →
                       </div>
-                      <div style={{ marginTop: 20, fontSize: 11, color: 'var(--text3)', lineHeight: 1.7 }}>
-                        Sheet "Annualized_Panel" · company metrics by year<br />
+                      <div style={{ marginTop: 20, fontSize: 11, color: '#334155', lineHeight: 1.8 }}>
+                        Sheet "Annualized_Panel" or "Annualized_Used"<br />
                         Your data never leaves this browser
                       </div>
                     </>}
@@ -280,10 +319,10 @@ function UploadZone({ onData }) {
         </div>
       </div>
 
-      {/* Footer strip */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: '14px 24px', display: 'flex', justifyContent: 'center', gap: 24, flexWrap: 'wrap' }}>
-        {['Pooled OLS', 'Ridge Regression', 'Fixed Effects', 'Walk-forward CV', 'AI Chat'].map(t => (
-          <span key={t} style={{ fontSize: 11, color: 'var(--text3)', letterSpacing: '0.08em' }}>{t}</span>
+      {/* Bottom footer strip */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)', padding: '12px 32px', display: 'flex', justifyContent: 'center', gap: 32, flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
+        {['Pooled OLS', 'Ridge Regression', 'Fixed Effects', 'Walk-forward CV', 'AI Analyst', 'PDF Reports'].map(t => (
+          <span key={t} style={{ fontSize: 10, color: '#1e293b', letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 500 }}>{t}</span>
         ))}
       </div>
     </div>
