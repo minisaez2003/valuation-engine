@@ -140,9 +140,26 @@ function UploadZone({ onData }) {
   const [loading, setLoading] = useState(false)
   const [pendingData, setPendingData] = useState(null)
   const [showWarning, setShowWarning] = useState(false)
+  const [fileSensitivityWarning, setFileSensitivityWarning] = useState(null)
+
+  // I: audit log — save filename + date to localStorage (no data, just metadata)
+  const logFileAccess = (filename, companies, target) => {
+    try {
+      const log = JSON.parse(localStorage.getItem('ve_audit_log') || '[]')
+      log.unshift({ filename, companies, target, date: new Date().toISOString(), confirmed: true })
+      if (log.length > 50) log.pop() // keep last 50 entries
+      localStorage.setItem('ve_audit_log', JSON.stringify(log))
+    } catch {}
+  }
 
   const processFile = f => {
     if (!f) return
+    // J: Check filename for potential confidential data keywords
+    const filename = f.name || ''
+    const sensitivePatterns = /confidential|NDA|nonpublic|non-public|MNPI|private|project\s*[a-z]/i
+    const dealPatterns = /\b(deal|target|acquire|acquisition|merger|M&A|DD|due.?dilig|IM\b|CIM\b|pitch.?book)\b/i
+    const isSensitive = sensitivePatterns.test(filename) || dealPatterns.test(filename)
+    setFileSensitivityWarning(isSensitive ? filename : null)
     setLoading(true)
     const r = new FileReader()
     r.onload = e => {
@@ -163,9 +180,12 @@ function UploadZone({ onData }) {
 
   const confirmAndLoad = () => {
     if (pendingData) {
+      // I: log the file access
+      logFileAccess(pendingData.name, pendingData.data?.length || 0, 'pending')
       onData(pendingData.data, pendingData.name)
       setShowWarning(false)
       setPendingData(null)
+      setFileSensitivityWarning(null)
     }
   }
 
@@ -210,6 +230,12 @@ function UploadZone({ onData }) {
           <div style={{ background: '#111520', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '32px 36px', maxWidth: 520, width: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.8)' }}>
             <div style={{ fontSize: 28, marginBottom: 14 }}>⚠️</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: 'white', marginBottom: 14 }}>Public Data Only</div>
+            {/* J: Sensitive filename alert */}
+            {fileSensitivityWarning && (
+              <div style={{ padding: '12px 16px', background: 'rgba(244,63,94,0.15)', border: '1px solid rgba(244,63,94,0.4)', borderRadius: 10, marginBottom: 16, fontSize: 12, color: '#f87171', lineHeight: 1.7 }}>
+                <strong>⚠ Filename alert:</strong> "<em>{fileSensitivityWarning}</em>" may contain sensitive deal data. Are you certain this file contains only public market information?
+              </div>
+            )}
             <div style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.9, marginBottom: 24 }}>
               This tool is designed for use with <strong style={{ color: 'white' }}>publicly available market data only</strong>. Do not upload:
               <ul style={{ marginTop: 10, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -351,15 +377,30 @@ function SetupScreen({ rawData, sheetName, onRun, onReset }) {
     return picked.length >= 3 ? picked : DEFAULT_FEATURES.filter(f => numCols.includes(f))
   }, [numCols])
 
-  const [target, setTarget] = useState(() =>
-    DEFAULT_Y_CANDIDATES.find(c => numCols.includes(c)) || targetCols[0] || DEFAULT_Y
-  )
+  const [target, setTarget] = useState(() => {
+    // D: restore from localStorage if available
+    try {
+      const saved = JSON.parse(localStorage.getItem('ve_config') || '{}')
+      if (saved.target && numCols.includes(saved.target)) return saved.target
+    } catch {}
+    return DEFAULT_Y_CANDIDATES.find(c => numCols.includes(c)) || targetCols[0] || DEFAULT_Y
+  })
   const featureCols = useMemo(() => numCols.filter(c => !META_SKIP.has(c) && c !== target), [numCols, target])
 
-  const [client, setClient] = useState(allCompanies[0] || '')
+  const [client, setClient] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('ve_config') || '{}')
+      if (saved.client && allCompanies.includes(saved.client)) return saved.client
+    } catch {}
+    return allCompanies[0] || ''
+  })
   const [selCos, setSelCos] = useState(allCompanies)
   const [yearRange, setYearRange] = useState([2018, 2025])
   const [features, setFeatures] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('ve_config') || '{}')
+      if (Array.isArray(saved.features) && saved.features.every(f => numCols.includes(f))) return saved.features
+    } catch {}
     const picked = []
     for (const group of DEFAULT_FEATURES_CANDIDATES) {
       const match = group.find(c => numCols.includes(c))
@@ -369,11 +410,17 @@ function SetupScreen({ rawData, sheetName, onRun, onReset }) {
       ? DEFAULT_FEATURES.filter(f => numCols.includes(f))
       : numCols.slice(0, 6)
   })
-  const [method, setMethod] = useState('ols')
+  const [method, setMethod] = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem('ve_config') || '{}'); return s.method || 'ols' } catch { return 'ols' }
+  })
   const [filterOut, setFilterOut] = useState(true)
-  const [useRelative, setUseRelative] = useState(false)
+  const [useRelative, setUseRelative] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ve_config') || '{}').useRelative || false } catch { return false }
+  })
   const [running, setRunning] = useState(false)
   const [warning, setWarning] = useState('')
+  // E: advanced config collapsed by default — MD sees Quick Run first
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const validF = features.filter(f => f !== target)
   const filteredRows = useMemo(() => rows.filter(r => selCos.includes(r._company) && r._year >= yearRange[0] && r._year <= yearRange[1]), [rows, selCos, yearRange])
@@ -389,6 +436,8 @@ function SetupScreen({ rawData, sheetName, onRun, onReset }) {
 
   const handleRun = () => {
     setWarning('')
+    // D: save config so next session pre-fills
+    try { localStorage.setItem('ve_config', JSON.stringify({ target, client, features, method, useRelative })) } catch {}
     // Optionally compute relative multiple as target
     const workRows = useRelative ? computeRelativeMultiple(filteredRows, target) : filteredRows
     const effectiveTarget = useRelative ? '_relativeMultiple' : target
@@ -446,55 +495,95 @@ function SetupScreen({ rawData, sheetName, onRun, onReset }) {
         <button onClick={onReset} style={{ fontSize: 12, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)' }}>← Change file</button>
       </div>
       <div style={{ flex: 1 }} className="setup-pad setup-max">
-        <div className="fade-up" style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Configure your model</div>
-          <div style={{ fontSize: 13, color: 'var(--text2)', fontWeight: 300 }}>Choose your settings — then run the regression to see results</div>
-        </div>
 
-        <div className="grid-2" style={{ marginBottom: 14 }}>
-          <div className="glass fade-up d1">
-            <div className="slabel">Predict (Y)</div>
-            <select className="sel" value={target} onChange={e => { setTarget(e.target.value); setFeatures(f => f.filter(x => x !== e.target.value)) }}>{targetCols.map(c => <option key={c} value={c}>{c}</option>)}</select>
-          </div>
-          <div className="glass fade-up d1">
-            <div className="slabel">★ Your client</div>
-            <select className="sel" value={client} onChange={e => setClient(e.target.value)}>{allCompanies.map(c => <option key={c} value={c}>{c}</option>)}</select>
-          </div>
-        </div>
-
-        <div className="glass fade-up d2" style={{ marginBottom: 14 }}>
-          <div className="slabel">Regression method</div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {methods.map(m => (
-              <div key={m.val} className={`mcard ${method === m.val ? 'sel' : ''}`} onClick={() => setMethod(m.val)}>
-                <div className="radio" />
-                <div className="mname">{m.label}</div>
-                <div className="mdesc">{m.desc}</div>
+        {/* E: Quick Run hero — visible first, no scrolling needed */}
+        <div className="glass fade-up" style={{ marginBottom: 20, padding: '24px 28px', borderLeft: '4px solid var(--blue)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Ready to run</div>
+              <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6 }}>
+                <strong style={{ color: 'var(--text)' }}>{client?.split(',')[0] || 'Client'}</strong> · {target} · {method.toUpperCase()} · {obsCount} observations
               </div>
-            ))}
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Valuation range + peer ranking + AI analyst ready in seconds</div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                className="run-btn"
+                onClick={() => {
+                  setTarget(smartDefaultY); setFeatures(smartDefaultFeatures); setMethod('ols')
+                  setFilterOut(true); setSelCos(allCompanies)
+                  const yrNums = allYears.map(Number)
+                  setYearRange([Math.min(...yrNums), Math.max(...yrNums)])
+                  setTimeout(handleRun, 50)
+                }}
+                disabled={running || obsCount < 5}
+                style={{ background: 'var(--green, #10b981)', minWidth: 160 }}>
+                {running ? <><div className="spinner" />Running…</> : '⚡ Quick run'}
+              </button>
+              <button className="run-btn" onClick={handleRun} disabled={running || obsCount < 5}
+                style={{ background: 'var(--blue)', minWidth: 140 }}>
+                {running ? <><div className="spinner" />Running…</> : '▶ Run with my settings'}
+              </button>
+            </div>
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, cursor: 'pointer', fontSize: 12, color: filterOut ? 'var(--amber)' : 'var(--text3)' }}>
-            <input type="checkbox" checked={filterOut} onChange={e => setFilterOut(e.target.checked)} style={{ accentColor: 'var(--amber)', width: 14, height: 14 }} />
-            Filter extreme outliers (IQR × 3) — removes negative multiples like QXO
-          </label>
+          {warning && <div className="warn" style={{ marginTop: 12 }}>⚠ {warning}</div>}
         </div>
 
-        {/* Target mode toggle */}
-        <div className="glass fade-up d2" style={{ marginBottom: 14 }}>
-          <div className="slabel">Prediction mode</div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div className={`mcard ${!useRelative ? 'sel' : ''}`} onClick={() => setUseRelative(false)} style={{ maxWidth: 300 }}>
-              <div className="radio" />
-              <div className="mname">Absolute multiple</div>
-              <div className="mdesc">Predicts the raw EV/EBITDA multiple directly. Wider prediction range but simpler to interpret.</div>
+        {/* E: Advanced config — collapsed by default */}
+        <div style={{ marginBottom: 14 }}>
+          <button
+            onClick={() => setShowAdvanced(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)', width: '100%', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 500 }}>⚙ Advanced configuration · {showAdvanced ? 'collapse' : 'expand to customise'}</span>
+            <span style={{ color: 'var(--text3)', fontSize: 16 }}>{showAdvanced ? '▲' : '▼'}</span>
+          </button>
+        </div>
+
+        {showAdvanced && <>
+          <div className="grid-2" style={{ marginBottom: 14 }}>
+            <div className="glass fade-up d1">
+              <div className="slabel">Predict (Y)</div>
+              <select className="sel" value={target} onChange={e => { setTarget(e.target.value); setFeatures(f => f.filter(x => x !== e.target.value)) }}>{targetCols.map(c => <option key={c} value={c}>{c}</option>)}</select>
             </div>
-            <div className={`mcard ${useRelative ? 'sel' : ''}`} onClick={() => setUseRelative(true)} style={{ maxWidth: 300 }}>
-              <div className="radio" />
-              <div className="mname" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>Relative to sector <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, background: 'var(--green-d, rgba(16,185,129,0.12))', color: 'var(--green)', border: '1px solid rgba(16,185,129,0.25)', fontWeight: 500 }}>Recommended</span></div>
-              <div className="mdesc">Predicts how much above or below the sector median a company should trade. Removes macro noise (rate cycles, sentiment) and focuses on company-specific premium. Cleaner signal.</div>
+            <div className="glass fade-up d1">
+              <div className="slabel">★ Your client</div>
+              <select className="sel" value={client} onChange={e => setClient(e.target.value)}>{allCompanies.map(c => <option key={c} value={c}>{c}</option>)}</select>
             </div>
           </div>
-        </div>
+
+          <div className="glass fade-up d2" style={{ marginBottom: 14 }}>
+            <div className="slabel">Regression method</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {methods.map(m => (
+                <div key={m.val} className={`mcard ${method === m.val ? 'sel' : ''}`} onClick={() => setMethod(m.val)}>
+                  <div className="radio" />
+                  <div className="mname">{m.label}</div>
+                  <div className="mdesc">{m.desc}</div>
+                </div>
+              ))}
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, cursor: 'pointer', fontSize: 12, color: filterOut ? 'var(--amber)' : 'var(--text3)' }}>
+              <input type="checkbox" checked={filterOut} onChange={e => setFilterOut(e.target.checked)} style={{ accentColor: 'var(--amber)', width: 14, height: 14 }} />
+              Filter extreme outliers (IQR × 3) — removes negative multiples like QXO
+            </label>
+          </div>
+
+          {/* Target mode toggle */}
+          <div className="glass fade-up d2" style={{ marginBottom: 14 }}>
+            <div className="slabel">Prediction mode</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div className={`mcard ${!useRelative ? 'sel' : ''}`} onClick={() => setUseRelative(false)} style={{ maxWidth: 300 }}>
+                <div className="radio" />
+                <div className="mname">Absolute multiple</div>
+                <div className="mdesc">Predicts the raw multiple directly. Wider prediction range but simpler.</div>
+              </div>
+              <div className={`mcard ${useRelative ? 'sel' : ''}`} onClick={() => setUseRelative(true)} style={{ maxWidth: 300 }}>
+                <div className="radio" />
+                <div className="mname" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>Relative to sector <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, background: 'var(--green-d, rgba(16,185,129,0.12))', color: 'var(--green)', border: '1px solid rgba(16,185,129,0.25)', fontWeight: 500 }}>Recommended</span></div>
+                <div className="mdesc">Predicts premium/discount vs sector median. Removes macro noise. Cleaner signal.</div>
+              </div>
+            </div>
+          </div>
 
         <div className="glass fade-up d3" style={{ marginBottom: 14 }}>
           <div className="slabel">Year range</div>
@@ -516,42 +605,18 @@ function SetupScreen({ rawData, sheetName, onRun, onReset }) {
           </div>
         </div>
 
-        <div className="glass fade-up d4" style={{ marginBottom: 24 }}>
+        <div className="glass fade-up d4" style={{ marginBottom: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div className="slabel" style={{ margin: 0 }}>Independent variables X ({validF.length} selected)</div>
             <button onClick={() => setFeatures(smartDefaultFeatures)} style={{ fontSize: 11, color: 'var(--blue)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)' }}>Reset to recommended</button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-            {featureCols.map(f => { const on = features.includes(f); const rec = DEFAULT_FEATURES.includes(f); return <div key={f} className={`chip ${on ? 'on' : ''}`} onClick={() => setFeatures(p => p.includes(f) ? p.filter(x => x !== f) : [...p, f])} style={{ opacity: on ? 1 : 0.4 }}>{rec && <span style={{ fontSize: 9, opacity: 0.6 }}>★</span>}{f}</div> })}
+            {featureCols.map(f => { const on = features.includes(f); const rec = DEFAULT_FEATURES.includes(f) || smartDefaultFeatures.includes(f); return <div key={f} className={`chip ${on ? 'on' : ''}`} onClick={() => setFeatures(p => p.includes(f) ? p.filter(x => x !== f) : [...p, f])} style={{ opacity: on ? 1 : 0.4 }}>{rec && <span style={{ fontSize: 9, opacity: 0.6 }}>★</span>}{f}</div> })}
           </div>
-          <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>★ = recommended · Keep 4–7 variables for best results. The recommended variables (growth, margin, ROIC, scale, cyclicality, theme score) are fundamental drivers that work across different target multiples — they explain <em>why</em> companies trade at a premium or discount regardless of which multiple you predict.</div>
+          <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>★ = recommended · Keep 4–7 variables</div>
         </div>
+        </> }
 
-        <div style={{ marginBottom: 20, padding: '14px 18px', background: 'var(--bg2)', borderRadius: 12, borderLeft: '3px solid var(--blue)', fontSize: 12, color: 'var(--text2)', lineHeight: 1.8 }}>
-          <strong style={{ color: 'var(--blue)' }}>What you'll get:</strong> A fair-value range for {client?.split(',')[0] || 'your client'} based on {obsCount} data points across {selCos.length} companies. Ranked against all peers. AI analyst ready to explain every number.
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          <button className="run-btn" onClick={handleRun} disabled={running || obsCount < 5}>
-            {running ? <><div className="spinner" />Running…</> : '▶ Run Regression'}
-          </button>
-          <button
-            onClick={() => {
-              setTarget(smartDefaultY)
-              setFeatures(smartDefaultFeatures)
-              setMethod('ols')
-              setFilterOut(true)
-              setSelCos(allCompanies)
-              setYearRange([Math.min(...allYears), Math.max(...allYears)])
-              setTimeout(handleRun, 50)
-            }}
-            disabled={running || obsCount < 5}
-            style={{ padding: '12px 20px', borderRadius: 10, border: '1px solid var(--green)', background: 'var(--green-d, rgba(16,185,129,0.1))', color: 'var(--green)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 7 }}>
-            ⚡ Quick run — recommended settings
-          </button>
-          <div style={{ fontSize: 13, color: 'var(--text3)' }}>{validF.length} variables · <span style={{ color: 'var(--text2)' }}>{obsCount} observations</span></div>
-        </div>
-        {warning && <div className="warn">⚠ {warning}</div>}
       </div>
     </div>
   )
